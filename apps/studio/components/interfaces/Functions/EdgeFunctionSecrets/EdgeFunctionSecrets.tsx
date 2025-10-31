@@ -37,7 +37,7 @@ const EdgeFunctionSecrets = () => {
     projectRef: projectRef,
   })
 
-  const { mutate: deleteSecret, isLoading: isDeleting } = useSecretsDeleteMutation({
+  const { mutate: deleteSecret, isPending: isDeleting } = useSecretsDeleteMutation({
     onSuccess: () => {
       toast.success(`Successfully deleted ${selectedSecret?.secret.name}`)
       setSelectedSecret(undefined)
