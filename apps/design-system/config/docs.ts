@@ -35,6 +35,11 @@ export const docsConfig: DocsConfig = {
           href: '/docs/icons',
           items: [],
         },
+        {
+          items: [],
+          href: '/docs/ui-patterns/accessibility',
+          title: 'Accessibility',
+        },
       ],
     },
     {
@@ -43,6 +48,11 @@ export const docsConfig: DocsConfig = {
         {
           title: 'Navigation',
           href: '/docs/ui-patterns/navigation',
+          items: [],
+        },
+        {
+          title: 'Layout',
+          href: '/docs/ui-patterns/layout',
           items: [],
         },
         {
@@ -73,6 +83,21 @@ export const docsConfig: DocsConfig = {
         {
           title: 'Modal',
           href: '/docs/fragments/modal',
+          items: [],
+        },
+        {
+          title: 'Page Container',
+          href: '/docs/fragments/page-container',
+          items: [],
+        },
+        {
+          title: 'Page Header',
+          href: '/docs/fragments/page-header',
+          items: [],
+        },
+        {
+          title: 'Page Section',
+          href: '/docs/fragments/page-section',
           items: [],
         },
         {
