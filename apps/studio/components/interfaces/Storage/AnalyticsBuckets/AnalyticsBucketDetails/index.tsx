@@ -73,7 +73,8 @@ export const AnalyticBucketDetails = () => {
   const { data, isSuccess: isSuccessPipelineStatus } = useReplicationPipelineStatusQuery(
     { projectRef, pipelineId: pipeline?.id },
     {
-      refetchInterval: (data) => {
+      refetchInterval: (query) => {
+        const data = query.state.data
         if (data?.status.name !== 'started') return 4000
         else return false
       },
@@ -118,7 +119,8 @@ export const AnalyticBucketDetails = () => {
       warehouse: wrapperValues.warehouse,
     },
     {
-      refetchInterval: (data = []) => {
+      refetchInterval: (query) => {
+        const data = query.state.data as string[]
         if (pollIntervalNamespaces === 0) return false
 
         const publicationTableSchemas = publication?.tables.map((x) => x.schema) ?? []
