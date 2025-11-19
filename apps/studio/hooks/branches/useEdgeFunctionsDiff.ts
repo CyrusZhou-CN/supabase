@@ -86,7 +86,7 @@ export const useEdgeFunctionsDiff = ({
   const {
     added = [],
     removed = [],
-    overlap = [],
+    modified = [],
   } = useMemo(() => {
     if (!currentBranchFunctions || !mainBranchFunctions) {
       return { added: [], removed: [], overlap: [] as typeof currentBranchFunctions }
@@ -97,18 +97,20 @@ export const useEdgeFunctionsDiff = ({
 
     const added = currentFuncs.filter((c) => !mainFuncs.find((m) => m.slug === c.slug))
     const removed = mainFuncs.filter((m) => !currentFuncs.find((c) => c.slug === m.slug))
-    const overlap = currentFuncs.filter((c) => mainFuncs.find((m) => m.slug === c.slug))
+    const modified = currentFuncs.filter((c) =>
+      mainFuncs.find((m) => m.ezbr_sha256 !== c.ezbr_sha256)
+    )
 
-    return { added, removed, overlap }
+    return { added, removed, modified }
   }, [currentBranchFunctions, mainBranchFunctions])
 
-  const overlapSlugs = overlap.map((f) => f.slug)
+  const modifiedSlugs = modified.map((f) => f.slug)
   const addedSlugs = added.map((f) => f.slug)
   const removedSlugs = removed.map((f) => f.slug)
 
   // Fetch function bodies ---------------------------------------------------
   const currentBodiesQueries = useQueries({
-    queries: overlapSlugs.map((slug) => ({
+    queries: modifiedSlugs.map((slug) => ({
       queryKey: ['edge-function-body', currentBranchRef, slug],
       queryFn: ({ signal }: { signal?: AbortSignal }) =>
         getEdgeFunctionBody({ projectRef: currentBranchRef, slug }, signal),
@@ -118,7 +120,7 @@ export const useEdgeFunctionsDiff = ({
   })
 
   const mainBodiesQueries = useQueries({
-    queries: overlapSlugs.map((slug) => ({
+    queries: modifiedSlugs.map((slug) => ({
       queryKey: ['edge-function-body', mainBranchRef, slug],
       queryFn: ({ signal }: { signal?: AbortSignal }) =>
         getEdgeFunctionBody({ projectRef: mainBranchRef, slug }, signal),
@@ -173,12 +175,12 @@ export const useEdgeFunctionsDiff = ({
   // Build lookup maps --------------------------------------------------------
   const currentBodiesMap: Record<string, EdgeFunctionBodyData | undefined> = {}
   currentBodiesQueries.forEach((q, idx) => {
-    if (q.data) currentBodiesMap[overlapSlugs[idx]] = q.data
+    if (q.data) currentBodiesMap[modifiedSlugs[idx]] = q.data
   })
 
   const mainBodiesMap: Record<string, EdgeFunctionBodyData | undefined> = {}
   mainBodiesQueries.forEach((q, idx) => {
-    if (q.data) mainBodiesMap[overlapSlugs[idx]] = q.data
+    if (q.data) mainBodiesMap[modifiedSlugs[idx]] = q.data
   })
 
   const addedBodiesMap: Record<string, EdgeFunctionBodyData | undefined> = {}
@@ -191,12 +193,11 @@ export const useEdgeFunctionsDiff = ({
     if (q.data) removedBodiesMap[removedSlugs[idx]] = q.data
   })
 
-  // Determine modified slugs and build file info -----------------------------
-  const modifiedSlugs: string[] = []
+  // Determine build file info for modified slugs -----------------------------
   const functionFileInfo: FunctionFileInfo = {}
 
   // Process overlapping functions to determine modifications and file info
-  overlapSlugs.forEach((slug) => {
+  modifiedSlugs.forEach((slug) => {
     const currentBody = currentBodiesMap[slug]
     const mainBody = mainBodiesMap[slug]
     if (!currentBody || !mainBody) return
