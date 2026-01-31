@@ -1,16 +1,14 @@
 import type { PostgresExtension } from '@supabase/postgres-meta'
-import { Database, ExternalLinkIcon, Plus } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
-
 import { DocsButton } from 'components/ui/DocsButton'
-import ShimmeringLoader from 'components/ui/ShimmeringLoader'
 import { useDatabaseExtensionEnableMutation } from 'data/database-extensions/database-extension-enable-mutation'
 import { useSchemasQuery } from 'data/database/schemas-query'
 import { executeSql } from 'data/sql/execute-sql-query'
 import { useIsOrioleDb, useSelectedProjectQuery } from 'hooks/misc/useSelectedProject'
 import { useProtectedSchemas } from 'hooks/useProtectedSchemas'
 import { DOCS_URL } from 'lib/constants'
+import { Database, ExternalLinkIcon, Plus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import {
   AlertDescription_Shadcn_,
   AlertTitle_Shadcn_,
@@ -23,8 +21,14 @@ import {
   WarningIcon,
 } from 'ui'
 import { Admonition } from 'ui-patterns'
+import { ShimmeringLoader } from 'ui-patterns/ShimmeringLoader'
 
 const orioleExtCallOuts = ['vector', 'postgis']
+
+// Extensions that have recommended schemas (rather than required schemas)
+const extensionsWithRecommendedSchemas: Record<string, string> = {
+  wrappers: 'extensions',
+}
 
 interface EnableExtensionModalProps {
   visible: boolean
@@ -38,7 +42,7 @@ const EnableExtensionModal = ({ visible, extension, onCancel }: EnableExtensionM
   const [defaultSchema, setDefaultSchema] = useState()
   const [fetchingSchemaInfo, setFetchingSchemaInfo] = useState(false)
 
-  const { data: schemas, isLoading: isSchemasLoading } = useSchemasQuery(
+  const { data: schemas, isPending: isSchemasLoading } = useSchemasQuery(
     {
       projectRef: project?.ref,
       connectionString: project?.connectionString,
@@ -46,7 +50,7 @@ const EnableExtensionModal = ({ visible, extension, onCancel }: EnableExtensionM
     { enabled: visible }
   )
   const { data: protectedSchemas } = useProtectedSchemas({ excludeSchemas: ['extensions'] })
-  const { mutate: enableExtension, isLoading: isEnabling } = useDatabaseExtensionEnableMutation({
+  const { mutate: enableExtension, isPending: isEnabling } = useDatabaseExtensionEnableMutation({
     onSuccess: () => {
       toast.success(`Extension "${extension.name}" is now enabled`)
       onCancel()
@@ -89,6 +93,22 @@ const EnableExtensionModal = ({ visible, extension, onCancel }: EnableExtensionM
     }
   }, [visible, extension.name])
 
+  const getSchemaDescriptionText = (extensionName: string, schema: string | null | undefined) => {
+    // Prioritize defaultSchema (required/forced) over recommended schema
+    if (schema) {
+      return `Extension must be installed in the “${schema}” schema.`
+    }
+
+    const recommendedSchema = extensionsWithRecommendedSchemas[extensionName]
+    if (recommendedSchema) {
+      return `Use the “${recommendedSchema}” schema for full compatibility with related features.`
+    }
+
+    return undefined
+  }
+
+  const isLoading = fetchingSchemaInfo || isSchemasLoading
+
   const validate = (values: any) => {
     const errors: any = {}
     if (values.schema === 'custom' && !values.name) errors.name = 'Required field'
@@ -124,8 +144,8 @@ const EnableExtensionModal = ({ visible, extension, onCancel }: EnableExtensionM
       size="small"
       header={
         <div className="flex items-baseline gap-2">
-          <h5 className="text-foreground">Confirm to enable</h5>
-          <code className="text-xs">{extension.name}</code>
+          <h5 className="text-foreground">Enable</h5>
+          <code className="text-code-inline">{extension.name}</code>
         </div>
       }
     >
@@ -151,7 +171,7 @@ const EnableExtensionModal = ({ visible, extension, onCancel }: EnableExtensionM
                   </Admonition>
                 )}
 
-                {fetchingSchemaInfo || isSchemasLoading ? (
+                {isLoading ? (
                   <div className="space-y-2">
                     <ShimmeringLoader />
                     <div className="w-3/4">
@@ -165,13 +185,14 @@ const EnableExtensionModal = ({ visible, extension, onCancel }: EnableExtensionM
                     name="schema"
                     value={defaultSchema}
                     label="Select a schema to enable the extension for"
-                    descriptionText={`Extension must be installed in ${defaultSchema}.`}
+                    descriptionText={getSchemaDescriptionText(extension.name, defaultSchema)}
                   />
                 ) : (
                   <Listbox
                     size="small"
                     name="schema"
                     label="Select a schema to enable the extension for"
+                    descriptionText={getSchemaDescriptionText(extension.name, null)}
                   >
                     <Listbox.Option
                       key="custom"
@@ -249,7 +270,7 @@ const EnableExtensionModal = ({ visible, extension, onCancel }: EnableExtensionM
                 <Button type="default" disabled={isEnabling} onClick={() => onCancel()}>
                   Cancel
                 </Button>
-                <Button htmlType="submit" disabled={isEnabling} loading={isEnabling}>
+                <Button htmlType="submit" disabled={isEnabling || isLoading} loading={isEnabling}>
                   Enable extension
                 </Button>
               </Modal.Content>
