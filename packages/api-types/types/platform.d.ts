@@ -917,6 +917,115 @@ export interface paths {
     patch: operations['OrganizationSlugController_updateOrganization']
     trace?: never
   }
+  '/platform/organizations/{slug}/apps': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List platform apps for the given organization */
+    get: operations['PlatformAppsController_listPlatformApps']
+    put?: never
+    /** Create new platform app */
+    post: operations['PlatformAppsController_createPlatformApp']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/platform/organizations/{slug}/apps/{app_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get organization platform app by the given id */
+    get: operations['PlatformAppsController_getPlatformApp']
+    put?: never
+    post?: never
+    /** Delete platform app */
+    delete: operations['PlatformAppsController_deletePlatformApp']
+    options?: never
+    head?: never
+    /** Update platform app */
+    patch: operations['PlatformAppsController_updatePlatformApp']
+    trace?: never
+  }
+  '/platform/organizations/{slug}/apps/{app_id}/signing-keys': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List signing keys for the given platform app */
+    get: operations['PlatformAppSigningKeysController_listPlatformAppSigningKeys']
+    put?: never
+    /** Create a signing key for the given platform app */
+    post: operations['PlatformAppSigningKeysController_createPlatformAppSigningKey']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/platform/organizations/{slug}/apps/{app_id}/signing-keys/{key_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** Delete a signing key for the given platform app */
+    delete: operations['PlatformAppSigningKeysController_deletePlatformAppSigningKey']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/platform/organizations/{slug}/apps/installations': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List platform app installations for the given organization */
+    get: operations['PlatformAppInstallationsController_listPlatformAppInstallations']
+    put?: never
+    /** Install a platform app to this organization */
+    post: operations['PlatformAppInstallationsController_installPlatformApp']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/platform/organizations/{slug}/apps/installations/{installation_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get platform app installation with the given id */
+    get: operations['PlatformAppInstallationsController_getPlatformAppInstallation']
+    put?: never
+    post?: never
+    /** Uninstall the given platform app installation */
+    delete: operations['PlatformAppInstallationsController_uninstallPlatformInstallation']
+    options?: never
+    head?: never
+    /** Update platform app installation permissions */
+    patch: operations['PlatformAppInstallationsController_updatePlatformAppInstallation']
+    trace?: never
+  }
   '/platform/organizations/{slug}/audit': {
     parameters: {
       query?: never
@@ -4320,7 +4429,24 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/platform/stripe/fabric/provisioning/account_requests/{id}': {
+  '/platform/stripe/invoices/overdue': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Gets information about overdue invoices that relate to the authenticated user */
+    get: operations['InvoicesController_getOverdueInvoices']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/platform/stripe/projects/provisioning/account_requests/{id}': {
     parameters: {
       query?: never
       header?: never
@@ -4337,7 +4463,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/platform/stripe/fabric/provisioning/account_requests/{id}/confirm': {
+  '/platform/stripe/projects/provisioning/account_requests/{id}/confirm': {
     parameters: {
       query?: never
       header?: never
@@ -4348,23 +4474,6 @@ export interface paths {
     put?: never
     /** Confirm account request (from Studio) */
     post: operations['AccountRequestsController_confirmAccountRequest']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/platform/stripe/invoices/overdue': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Gets information about overdue invoices that relate to the authenticated user */
-    get: operations['InvoicesController_getOverdueInvoices']
-    put?: never
-    post?: never
     delete?: never
     options?: never
     head?: never
@@ -4645,17 +4754,14 @@ export interface components {
     }
     AccountRequestDetailsDto: {
       email: string
+      email_matches: boolean
       expires_at: string
       id: string
-      name?: string
-      orchestrator: {
-        stripe?: {
-          account: string
-          organization?: string
-        }
-        type: string
+      linked_organization?: {
+        id: number
+        name: string
+        slug: string
       }
-      scopes?: string[]
       /** @enum {string} */
       status: 'pending' | 'complete' | 'expired'
     }
@@ -4840,6 +4946,10 @@ export interface components {
       payment_intent_id: string
       size?: string
     }
+    ConfirmRequestDto: {
+      organization_id?: number
+      organization_name?: string
+    }
     ConfirmResponseDto: {
       organization_slug: string
       success: boolean
@@ -5022,6 +5132,7 @@ export interface components {
     }
     CreateInvitationBody: {
       email: string
+      require_sso?: boolean
       role_id: number
       role_scoped_projects?: string[]
     }
@@ -5206,13 +5317,14 @@ export interface components {
             | 'fly'
             | 'aws_marketplace'
             | 'vercel_marketplace'
-            | 'stripe_product'
+            | 'stripe_projects'
             | null
           id: number
           is_owner: boolean
           name: string
           opt_in_tags: string[]
           organization_missing_address: boolean
+          organization_missing_tax_id: boolean
           organization_requires_mfa: boolean
           plan: {
             /** @enum {string} */
@@ -5235,6 +5347,110 @@ export interface components {
        * @example 1012
        */
       id: number
+    }
+    CreatePlatformAppBody: {
+      description?: string
+      name: string
+      permissions: (
+        | 'organizations_read'
+        | 'organizations_create'
+        | 'projects_read'
+        | 'snippets_read'
+        | 'organization_admin_read'
+        | 'organization_admin_write'
+        | 'members_read'
+        | 'members_write'
+        | 'organization_projects_read'
+        | 'organization_projects_create'
+        | 'project_admin_read'
+        | 'project_admin_write'
+        | 'action_runs_read'
+        | 'action_runs_write'
+        | 'advisors_read'
+        | 'analytics_logs_read'
+        | 'analytics_usage_read'
+        | 'api_gateway_keys_read'
+        | 'api_gateway_keys_write'
+        | 'auth_config_read'
+        | 'auth_config_write'
+        | 'auth_signing_keys_read'
+        | 'auth_signing_keys_write'
+        | 'backups_read'
+        | 'backups_write'
+        | 'branching_development_create'
+        | 'branching_development_delete'
+        | 'branching_development_read'
+        | 'branching_development_write'
+        | 'branching_production_create'
+        | 'branching_production_delete'
+        | 'branching_production_read'
+        | 'branching_production_write'
+        | 'custom_domain_read'
+        | 'custom_domain_write'
+        | 'data_api_config_read'
+        | 'data_api_config_write'
+        | 'database_read'
+        | 'database_write'
+        | 'database_config_read'
+        | 'database_config_write'
+        | 'database_jit_read'
+        | 'database_jit_write'
+        | 'database_network_bans_read'
+        | 'database_network_bans_write'
+        | 'database_network_restrictions_read'
+        | 'database_network_restrictions_write'
+        | 'database_migrations_read'
+        | 'database_migrations_write'
+        | 'database_pooling_config_read'
+        | 'database_pooling_config_write'
+        | 'database_readonly_config_read'
+        | 'database_readonly_config_write'
+        | 'database_ssl_config_read'
+        | 'database_ssl_config_write'
+        | 'database_webhooks_config_read'
+        | 'database_webhooks_config_write'
+        | 'edge_functions_read'
+        | 'edge_functions_write'
+        | 'edge_functions_secrets_read'
+        | 'edge_functions_secrets_write'
+        | 'infra_add_ons_read'
+        | 'infra_add_ons_write'
+        | 'infra_disk_config_read'
+        | 'infra_disk_config_write'
+        | 'infra_read_replicas_read'
+        | 'infra_read_replicas_write'
+        | 'project_snippets_read'
+        | 'project_snippets_write'
+        | 'storage_read'
+        | 'storage_write'
+        | 'storage_config_read'
+        | 'storage_config_write'
+        | 'vanity_subdomain_read'
+        | 'vanity_subdomain_write'
+      )[]
+    }
+    CreatePlatformAppResponse: {
+      /** Format: date-time */
+      created_at: string
+      /** Format: uuid */
+      created_by: string
+      description: string | null
+      /** Format: uuid */
+      id: string
+      name: string
+      permissions: string[]
+      /** Format: date-time */
+      updated_at: string
+    }
+    CreatePlatformAppSigningKeyResponse: {
+      /** Format: date-time */
+      created_at: string
+      /** Format: uuid */
+      created_by: string
+      fingerprint: string
+      /** Format: uuid */
+      id: string
+      private_key: string
     }
     CreateProjectBody: {
       auth_site_url?: string
@@ -5277,6 +5493,8 @@ export interface components {
         | '48xlarge_optimized_memory'
         | '48xlarge_optimized_cpu'
         | '48xlarge_high_memory'
+      /** @description Whether to enable high availability for the project. */
+      high_availability?: boolean
       name: string
       organization_slug: string
       /**
@@ -6291,6 +6509,33 @@ export interface components {
       }
       updated_at: string
     }
+    GetPlatformAppInstallationResponse: {
+      /** Format: uuid */
+      app_id: string
+      /** Format: date-time */
+      created_at: string
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      installed_by: string
+      organization_slug: string
+      permissions: string[]
+      /** Format: date-time */
+      updated_at: string
+    }
+    GetPlatformAppResponse: {
+      /** Format: date-time */
+      created_at: string
+      /** Format: uuid */
+      created_by: string
+      description: string | null
+      /** Format: uuid */
+      id: string
+      name: string
+      permissions: string[]
+      /** Format: date-time */
+      updated_at: string
+    }
     GetPostgrestConfigResponse: {
       db_anon_role: string
       db_extra_search_path: string
@@ -6556,7 +6801,7 @@ export interface components {
       }[]
       billing_cycle_anchor: number
       /** @enum {string} */
-      billing_partner?: 'fly' | 'aws_marketplace' | 'vercel_marketplace' | 'stripe_product'
+      billing_partner?: 'fly' | 'aws_marketplace' | 'vercel_marketplace' | 'stripe_projects'
       billing_via_partner: boolean
       current_period_end: number
       current_period_start: number
@@ -6991,6 +7236,23 @@ export interface components {
       SMTP_USER: string
       URI_ALLOW_LIST: string
     }
+    InstallPlatformAppBody: {
+      /** Format: uuid */
+      app_id: string
+    }
+    InstallPlatformAppResponse: {
+      /** Format: uuid */
+      app_id: string
+      /** Format: date-time */
+      created_at: string
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      installed_by: string
+      organization_slug: string
+      /** Format: date-time */
+      updated_at: string
+    }
     InvitationByTokenResponse: {
       authorized_user: boolean
       email_match: boolean
@@ -7204,6 +7466,7 @@ export interface components {
             | 'auth.leaked_password_protection'
             | 'auth.advanced_auth_settings'
             | 'auth.performance_settings'
+            | 'auth.password_hibp'
             | 'backup.retention_days'
             | 'backup.restore_to_new_project'
             | 'function.max_count'
@@ -7223,6 +7486,7 @@ export interface components {
             | 'assistant.advance_model'
             | 'integrations.github_connections'
             | 'dedicated_pooler'
+            | 'observability.dashboard_advanced_metrics'
           /** @enum {string} */
           type: 'boolean' | 'numeric' | 'set'
         }
@@ -7300,6 +7564,50 @@ export interface components {
         last_used_at: string | null
         /** Format: uuid */
         oauth_app_id: string
+      }[]
+    }
+    ListPlatformAppInstallationsResponse: {
+      installations: {
+        /** Format: uuid */
+        app_id: string
+        /** Format: date-time */
+        created_at: string
+        /** Format: uuid */
+        id: string
+        /** Format: uuid */
+        installed_by: string
+        organization_slug: string
+        /** Format: date-time */
+        updated_at: string
+      }[]
+    }
+    ListPlatformAppSigningKeysResponse: {
+      keys: {
+        /** Format: uuid */
+        app_id: string
+        /** Format: date-time */
+        created_at: string
+        /** Format: uuid */
+        created_by: string
+        fingerprint: string
+        /** Format: uuid */
+        id: string
+        /** Format: date-time */
+        last_used_at: string | null
+      }[]
+    }
+    ListPlatformAppsResponse: {
+      apps: {
+        /** Format: date-time */
+        created_at: string
+        /** Format: uuid */
+        created_by: string
+        description: string | null
+        /** Format: uuid */
+        id: string
+        name: string
+        /** Format: date-time */
+        updated_at: string
       }[]
     }
     ListProjectsPaginatedResponse: {
@@ -7570,12 +7878,13 @@ export interface components {
     OrganizationResponse: {
       billing_email: string | null
       /** @enum {string|null} */
-      billing_partner: 'fly' | 'aws_marketplace' | 'vercel_marketplace' | 'stripe_product' | null
+      billing_partner: 'fly' | 'aws_marketplace' | 'vercel_marketplace' | 'stripe_projects' | null
       id: number
       is_owner: boolean
       name: string
       opt_in_tags: string[]
       organization_missing_address: boolean
+      organization_missing_tax_id: boolean
       organization_requires_mfa: boolean
       plan: {
         /** @enum {string} */
@@ -7633,7 +7942,7 @@ export interface components {
     OrganizationSlugResponse: {
       billing_email: string | null
       /** @enum {string|null} */
-      billing_partner: 'fly' | 'aws_marketplace' | 'vercel_marketplace' | 'stripe_product' | null
+      billing_partner: 'fly' | 'aws_marketplace' | 'vercel_marketplace' | 'stripe_projects' | null
       has_oriole_project: boolean
       id: number
       name: string
@@ -8349,6 +8658,7 @@ export interface components {
         | 'PAUSE_FAILED'
         | 'RESIZING'
       subscription_id: string
+      updated_at: string
       volumeSizeGb?: number
     }
     ProjectMembersResponse: {
@@ -8442,9 +8752,11 @@ export interface components {
       max_payload_size_in_kb: number | null
       /** @description Sets maximum number of presence events per second rate limit */
       max_presence_events_per_second: number | null
+      /** @description Whether to enable presence */
+      presence_enabled: boolean
       /** @description Whether to only allow private channels */
       private_only: boolean | null
-      /** @description Whether to suspend realtime */
+      /** @description Disables the Realtime service for this project when true. Set to false to re-enable it. */
       suspend: boolean | null
     }
     RegionsInfo: {
@@ -10217,6 +10529,101 @@ export interface components {
       server_idle_timeout?: number
       server_lifetime?: number
     }
+    UpdatePlatformAppBody: {
+      description?: string
+      name: string
+      permissions: (
+        | 'organizations_read'
+        | 'organizations_create'
+        | 'projects_read'
+        | 'snippets_read'
+        | 'organization_admin_read'
+        | 'organization_admin_write'
+        | 'members_read'
+        | 'members_write'
+        | 'organization_projects_read'
+        | 'organization_projects_create'
+        | 'project_admin_read'
+        | 'project_admin_write'
+        | 'action_runs_read'
+        | 'action_runs_write'
+        | 'advisors_read'
+        | 'analytics_logs_read'
+        | 'analytics_usage_read'
+        | 'api_gateway_keys_read'
+        | 'api_gateway_keys_write'
+        | 'auth_config_read'
+        | 'auth_config_write'
+        | 'auth_signing_keys_read'
+        | 'auth_signing_keys_write'
+        | 'backups_read'
+        | 'backups_write'
+        | 'branching_development_create'
+        | 'branching_development_delete'
+        | 'branching_development_read'
+        | 'branching_development_write'
+        | 'branching_production_create'
+        | 'branching_production_delete'
+        | 'branching_production_read'
+        | 'branching_production_write'
+        | 'custom_domain_read'
+        | 'custom_domain_write'
+        | 'data_api_config_read'
+        | 'data_api_config_write'
+        | 'database_read'
+        | 'database_write'
+        | 'database_config_read'
+        | 'database_config_write'
+        | 'database_jit_read'
+        | 'database_jit_write'
+        | 'database_network_bans_read'
+        | 'database_network_bans_write'
+        | 'database_network_restrictions_read'
+        | 'database_network_restrictions_write'
+        | 'database_migrations_read'
+        | 'database_migrations_write'
+        | 'database_pooling_config_read'
+        | 'database_pooling_config_write'
+        | 'database_readonly_config_read'
+        | 'database_readonly_config_write'
+        | 'database_ssl_config_read'
+        | 'database_ssl_config_write'
+        | 'database_webhooks_config_read'
+        | 'database_webhooks_config_write'
+        | 'edge_functions_read'
+        | 'edge_functions_write'
+        | 'edge_functions_secrets_read'
+        | 'edge_functions_secrets_write'
+        | 'infra_add_ons_read'
+        | 'infra_add_ons_write'
+        | 'infra_disk_config_read'
+        | 'infra_disk_config_write'
+        | 'infra_read_replicas_read'
+        | 'infra_read_replicas_write'
+        | 'project_snippets_read'
+        | 'project_snippets_write'
+        | 'storage_read'
+        | 'storage_write'
+        | 'storage_config_read'
+        | 'storage_config_write'
+        | 'vanity_subdomain_read'
+        | 'vanity_subdomain_write'
+      )[]
+    }
+    UpdatePlatformAppInstallationResponse: {
+      /** Format: uuid */
+      app_id: string
+      /** Format: date-time */
+      created_at: string
+      /** Format: uuid */
+      id: string
+      /** Format: uuid */
+      installed_by: string
+      organization_slug: string
+      permissions: string[]
+      /** Format: date-time */
+      updated_at: string
+    }
     UpdatePoolingConfigResponse: {
       default_pool_size?: number
       ignore_startup_parameters: string
@@ -10278,9 +10685,11 @@ export interface components {
       max_payload_size_in_kb?: number
       /** @description Sets maximum number of presence events per second rate limit */
       max_presence_events_per_second?: number
+      /** @description Whether to enable presence */
+      presence_enabled?: boolean
       /** @description Whether to only allow private channels */
       private_only?: boolean
-      /** @description Whether to suspend realtime */
+      /** @description Disables the Realtime service for this project when true. Set to false to re-enable it. */
       suspend?: boolean
     }
     UpdateReplicationDestinationBody: {
@@ -13454,6 +13863,308 @@ export interface operations {
           [name: string]: unknown
         }
         content?: never
+      }
+    }
+  }
+  PlatformAppsController_listPlatformApps: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description Organization slug */
+        slug: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ListPlatformAppsResponse']
+        }
+      }
+    }
+  }
+  PlatformAppsController_createPlatformApp: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description Organization slug */
+        slug: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreatePlatformAppBody']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CreatePlatformAppResponse']
+        }
+      }
+    }
+  }
+  PlatformAppsController_getPlatformApp: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        app_id: string
+        /** @description Organization slug */
+        slug: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['GetPlatformAppResponse']
+        }
+      }
+    }
+  }
+  PlatformAppsController_deletePlatformApp: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        app_id: string
+        /** @description Organization slug */
+        slug: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  PlatformAppsController_updatePlatformApp: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        app_id: string
+        /** @description Organization slug */
+        slug: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdatePlatformAppBody']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['GetPlatformAppResponse']
+        }
+      }
+    }
+  }
+  PlatformAppSigningKeysController_listPlatformAppSigningKeys: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        app_id: string
+        /** @description Organization slug */
+        slug: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ListPlatformAppSigningKeysResponse']
+        }
+      }
+    }
+  }
+  PlatformAppSigningKeysController_createPlatformAppSigningKey: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        app_id: string
+        /** @description Organization slug */
+        slug: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CreatePlatformAppSigningKeyResponse']
+        }
+      }
+    }
+  }
+  PlatformAppSigningKeysController_deletePlatformAppSigningKey: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        app_id: string
+        key_id: string
+        /** @description Organization slug */
+        slug: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  PlatformAppInstallationsController_listPlatformAppInstallations: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description Organization slug */
+        slug: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ListPlatformAppInstallationsResponse']
+        }
+      }
+    }
+  }
+  PlatformAppInstallationsController_installPlatformApp: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description Organization slug */
+        slug: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['InstallPlatformAppBody']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InstallPlatformAppResponse']
+        }
+      }
+    }
+  }
+  PlatformAppInstallationsController_getPlatformAppInstallation: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        installation_id: string
+        /** @description Organization slug */
+        slug: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['GetPlatformAppInstallationResponse']
+        }
+      }
+    }
+  }
+  PlatformAppInstallationsController_uninstallPlatformInstallation: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        installation_id: string
+        /** @description Organization slug */
+        slug: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  PlatformAppInstallationsController_updatePlatformAppInstallation: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        installation_id: string
+        /** @description Organization slug */
+        slug: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UpdatePlatformAppInstallationResponse']
+        }
       }
     }
   }
@@ -17241,6 +17952,7 @@ export interface operations {
           | 'auth.leaked_password_protection'
           | 'auth.advanced_auth_settings'
           | 'auth.performance_settings'
+          | 'auth.password_hibp'
           | 'backup.retention_days'
           | 'backup.restore_to_new_project'
           | 'function.max_count'
@@ -17260,6 +17972,7 @@ export interface operations {
           | 'assistant.advance_model'
           | 'integrations.github_connections'
           | 'dedicated_pooler'
+          | 'observability.dashboard_advanced_metrics'
       }
       header?: never
       path?: never
@@ -26412,6 +27125,25 @@ export interface operations {
       }
     }
   }
+  InvoicesController_getOverdueInvoices: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['OverdueInvoiceCount'][]
+        }
+      }
+    }
+  }
   AccountRequestsController_getAccountRequest: {
     parameters: {
       query?: never
@@ -26442,7 +27174,11 @@ export interface operations {
       }
       cookie?: never
     }
-    requestBody?: never
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ConfirmRequestDto']
+      }
+    }
     responses: {
       200: {
         headers: {
@@ -26450,25 +27186,6 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ConfirmResponseDto']
-        }
-      }
-    }
-  }
-  InvoicesController_getOverdueInvoices: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['OverdueInvoiceCount'][]
         }
       }
     }
@@ -26517,13 +27234,6 @@ export interface operations {
     }
     responses: {
       201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      /** @description Failed to send analytics server event */
-      500: {
         headers: {
           [name: string]: unknown
         }

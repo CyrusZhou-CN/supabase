@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test'
 
 import { env } from '../env.config.js'
+import { expectClipboardValue } from '../utils/clipboard.js'
 import { createTable, dropTable, query } from '../utils/db/index.js'
 import { test, withSetupCleanup } from '../utils/test.js'
 import { toUrl } from '../utils/to-url.js'
@@ -9,8 +10,6 @@ import {
   waitForApiResponse,
   waitForDatabaseToLoad,
 } from '../utils/wait-for-response.js'
-
-const databaseColumnName = 'pw_database_column'
 
 test.describe('Database', () => {
   test.describe('Schema Visualizer', () => {
@@ -36,18 +35,20 @@ test.describe('Database', () => {
 
       // validates table and column exists
       await expect(page.getByText(databaseTableName, { exact: true })).toBeVisible()
-      await expect(page.getByText(databaseColumnName)).toBeVisible()
+      await expect(page.getByText(databaseColumnName, { exact: true })).toBeVisible()
 
       // copies schema definition to clipboard
       await page.getByRole('button', { name: 'Copy as SQL' }).click()
       await expect(page.getByTestId('copy-sql-ready')).toBeVisible()
-      const clipboardText = await page.evaluate(() => navigator.clipboard.readText())
-      expect(clipboardText).toContain(`CREATE TABLE public.${databaseTableName} (
+      await expectClipboardValue({
+        page,
+        value: `CREATE TABLE public.${databaseTableName} (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   created_at timestamp with time zone DEFAULT now(),
   ${databaseColumnName} text,
   CONSTRAINT ${databaseTableName}_pkey PRIMARY KEY (id)
-);`)
+);`,
+      })
 
       // downloads schema diagram when export is triggered
       const downloadPromise = page.waitForEvent('download')
@@ -60,21 +61,132 @@ test.describe('Database', () => {
       await page.getByTestId('schema-selector').click()
       await page.getByRole('option', { name: 'auth' }).click()
       await waitForDatabaseToLoad(page, ref, 'auth')
-      await expect(page.getByText('users')).toBeVisible()
-      await expect(page.getByText('sso_providers')).toBeVisible()
-      await expect(page.getByText('saml_providers')).toBeVisible()
+      await expect(page.getByText('users', { exact: true })).toBeVisible()
+      await expect(page.getByText('sso_providers', { exact: true })).toBeVisible()
+      await expect(page.getByText('saml_providers', { exact: true })).toBeVisible()
+    })
 
-      // navigate to table editor when icon is clicked
-      const samlProvidersHeader = await page.getByText('saml_providers')
-      await samlProvidersHeader.locator('..').getByRole('link').click()
+    test('table actions work as expected', async ({ page, ref }) => {
+      const databaseTableName = 'pw_database_schema_table_actions'
+      const databaseColumnName = 'pw_database_schema_column_table_actions'
+      await using _ = await withSetupCleanup(
+        async () => {
+          await createTable(databaseTableName, databaseColumnName)
+        },
+        async () => {
+          await dropTable(databaseTableName)
+        }
+      )
+      const wait = createApiResponseWaiter(
+        page,
+        'pg-meta',
+        ref,
+        'tables?include_columns=true&included_schemas=public'
+      )
+      await page.goto(toUrl(`/project/${env.PROJECT_REF}/database/schemas?schema=public`))
+      await wait
+
+      // validates table and column exists
+      await expect(page.getByText(databaseTableName, { exact: true })).toBeVisible()
+      // test we can edit the column
+      await page.getByText(`${databaseTableName} actions`).click()
+
+      await page.getByText(`${databaseTableName} actions`).click()
+      await expect(page.getByRole('menuitem', { name: 'Edit table' })).toBeVisible()
+      await page.getByRole('menuitem', { name: 'Edit table' }).click({ force: true })
+      await expect(page.getByRole('menuitem', { name: 'Edit table' })).not.toBeVisible()
+      const dialog = page.getByRole('dialog')
+      await expect(dialog).toBeVisible()
+      await expect(dialog.getByText('timestamptz')).toBeVisible()
+      await page.getByLabel('Description').fill('Bazinga')
+      await page.getByRole('button', { name: 'Save' }).click()
+      await expect(page.getByText(`Successfully updated ${databaseTableName}!`)).toBeVisible()
+      await expect(page.getByRole('dialog')).not.toBeVisible()
+
+      // test the schema view has been refreshed
+      await page.getByText(`${databaseTableName} actions`).click()
+      await expect(page.getByRole('menuitem', { name: 'Edit table' })).toBeVisible()
+      await page.getByRole('menuitem', { name: 'Edit table' }).click()
+      await expect(page.getByRole('menuitem', { name: 'Edit table' })).not.toBeVisible()
+      await expect(page.getByRole('dialog')).toBeVisible()
+      // FIXME: For some reason, the dialog is not stable and rerenders, sometimes preventing the description to be filled
+      await page.waitForTimeout(500)
+      await expect(page.getByLabel('Description')).toHaveValue('Bazinga')
+      await page.getByRole('button', { name: 'Cancel' }).click()
+      await expect(page.getByRole('dialog')).not.toBeVisible()
+
+      await page.getByText(`${databaseTableName} actions`).click()
+      await expect(page.getByRole('menuitem', { name: 'Copy name' })).toBeVisible()
+      await page.getByRole('menuitem', { name: 'Copy name' }).click()
+      await expect(page.getByRole('menuitem', { name: 'Copy name' })).not.toBeVisible()
+      await expectClipboardValue({ page, value: databaseTableName, exact: true })
+
+      await page.getByText(`${databaseTableName} actions`).click()
+      await expect(page.getByRole('menuitem', { name: 'View in Table Editor' })).toBeVisible()
+      await page.getByRole('menuitem', { name: 'View in Table Editor' }).click()
       await page.waitForURL(/.*\/editor\/\d+/)
-      await page.getByRole('button', { name: 'View saml_providers', exact: true }).click()
+      await expect(page.getByRole('tab', { name: databaseTableName })).toBeVisible()
+    })
+
+    test('columns actions work as expected', async ({ page, ref }) => {
+      const databaseTableName = 'pw_database_schema_columns_actions'
+      const databaseColumnName = 'pw_database_schema_column_actions'
+      await using _ = await withSetupCleanup(
+        async () => {
+          await createTable(databaseTableName, databaseColumnName)
+        },
+        async () => {
+          await dropTable(databaseTableName)
+        }
+      )
+      const wait = createApiResponseWaiter(
+        page,
+        'pg-meta',
+        ref,
+        'tables?include_columns=true&included_schemas=public'
+      )
+      await page.goto(toUrl(`/project/${env.PROJECT_REF}/database/schemas?schema=public`))
+      await wait
+
+      // validates table and column exists
+      await expect(page.getByText(databaseTableName, { exact: true })).toBeVisible()
+      await expect(page.getByText(databaseColumnName, { exact: true })).toBeVisible()
+      // test we can edit the column
+      await page
+        .getByText(`${databaseTableName} ${databaseColumnName} actions`)
+        .click({ force: true })
+      await expect(page.getByRole('menuitem', { name: 'Edit column' })).toBeVisible()
+      await page.getByRole('menuitem', { name: 'Edit column' }).click()
+      await page.getByLabel('Description').fill('Bazinga')
+      await page.getByRole('button', { name: 'Save' }).click()
+      await expect(
+        page.getByText(`Successfully updated column "${databaseColumnName}"`)
+      ).toBeVisible()
+      await expect(page.getByRole('dialog')).not.toBeVisible()
+
+      // test the schema view has been refreshed
+      await page
+        .getByText(`${databaseTableName} ${databaseColumnName} actions`)
+        .click({ force: true })
+      await expect(page.getByRole('menuitem', { name: 'Edit column' })).toBeVisible()
+      await page.getByRole('menuitem', { name: 'Edit column' }).click()
+      await expect(page.getByLabel('Description')).toHaveValue('Bazinga')
+      await page.getByRole('button', { name: 'Cancel' }).click()
+      await expect(page.getByRole('dialog')).not.toBeVisible()
+
+      await page
+        .getByText(`${databaseTableName} ${databaseColumnName} actions`)
+        .click({ force: true })
+      await expect(page.getByRole('menuitem', { name: 'Copy name' })).toBeVisible()
+      await page.getByRole('menuitem', { name: 'Copy name' }).click()
+      await expectClipboardValue({ page, value: databaseColumnName, exact: true })
     })
   })
 
   test.describe('Tables', () => {
     test('actions works as expected', async ({ page, ref }) => {
-      const databaseTableName = 'pw_database_actions_table'
+      const databaseTableName = 'pw_database_table_actions'
+      const databaseColumnName = 'pw_database_column_actions'
       await using _ = await withSetupCleanup(
         async () => {
           await createTable(databaseTableName, databaseColumnName)
@@ -124,10 +236,11 @@ test.describe('Database', () => {
     })
 
     test('CRUD operations and copy works as expected', async ({ page, ref }) => {
-      const databaseTableName = 'pw_database_tablecrud_table'
-      const databaseTableNameNew = 'pw_database_table_new'
-      const databaseTableNameUpdated = 'pw_database_table_updated'
-      const databaseTableNameDuplicate = 'pw_database_table_duplicate'
+      const databaseTableName = 'pw_database_table_crud_table'
+      const databaseTableNameNew = 'pw_database_table_crud_new'
+      const databaseTableNameUpdated = 'pw_database_table_crud_updated'
+      const databaseTableNameDuplicate = 'pw_database_table_crud_duplicate'
+      const databaseColumnName = 'pw_database_column_table_crud'
 
       await using _ = await withSetupCleanup(
         async () => {
@@ -147,7 +260,7 @@ test.describe('Database', () => {
 
       // create a new table
       await page.getByRole('button', { name: 'New table' }).click()
-      await page.getByTestId('table-name-input').fill(databaseTableNameNew)
+      await page.getByLabel('Name', { exact: true }).fill(databaseTableNameNew)
       const createTableWait = createApiResponseWaiter(
         page,
         'pg-meta',
@@ -185,8 +298,8 @@ test.describe('Database', () => {
         .last()
         .click()
       await page.getByRole('menuitem', { name: 'Duplicate Table' }).click()
-      await page.getByTestId('table-name-input').fill(databaseTableNameDuplicate)
-      await page.getByRole('textbox', { name: 'Optional' }).fill('')
+      await page.getByLabel('Name').fill(databaseTableNameDuplicate)
+      await page.getByLabel('Description').fill('')
       const duplicateTableWait = createApiResponseWaiter(page, 'pg-meta', ref, 'query?key=')
       await page.getByRole('button', { name: 'Save' }).click()
 
@@ -238,8 +351,9 @@ test.describe('Database', () => {
   test.describe('Tables columns', () => {
     test('can view, create, update, delete, and filter table columns', async ({ page, ref }) => {
       const databaseTableName = 'pw_database_columns_table'
-      const databaseColumnName2 = 'pw_database_column_2'
-      const databaseColumnName3 = 'pw_database_column_3'
+      const databaseColumnName = 'pw_database_column_crud'
+      const databaseColumnName2 = 'pw_database_column_crud_2'
+      const databaseColumnName3 = 'pw_database_column_crud_3'
 
       await using _ = await withSetupCleanup(
         async () => {
@@ -267,9 +381,8 @@ test.describe('Database', () => {
 
       // create a new table column
       await page.getByRole('button', { name: 'New column' }).click()
-      await page
-        .getByRole('textbox', { name: 'column_name', exact: true })
-        .fill('pw_database_column_2')
+      await expect(page.getByRole('dialog')).toBeVisible()
+      await page.getByLabel('name').fill(databaseColumnName2)
       await page.getByText('Choose a column type...').click()
       await page.getByText('numeric', { exact: true }).click()
       const columnCreateWait = createApiResponseWaiter(
@@ -296,7 +409,7 @@ test.describe('Database', () => {
       // update table column
       await columnDatabase2Row.getByRole('button').click()
       await page.getByRole('button', { name: 'Edit column' }).click()
-      await page.getByRole('textbox', { name: 'column_name' }).fill(databaseColumnName3)
+      await page.getByLabel('name').fill(databaseColumnName3)
       const columnUpdateWait = createApiResponseWaiter(
         page,
         'pg-meta',
@@ -375,6 +488,7 @@ test.describe('Database', () => {
 
     test('CRUD operations works as expected', async ({ page, ref }) => {
       const databaseTableName = 'pw_database_trigger_table'
+      const databaseColumnName = 'pw_database_column_trigger'
       const databaseTriggerName = 'pw_database_trigger'
       const databaseTriggerNameUpdated = 'pw_database_trigger_updated'
 
@@ -513,6 +627,7 @@ test.describe('Database', () => {
 
     test('CRUD operations works as expected', async ({ page, ref }) => {
       const databaseTableName = 'pw_database_indexes_table'
+      const databaseColumnName = 'pw_database_column_index'
       const databaseIndexName = 'pw_database_index'
 
       await using _ = await withSetupCleanup(
@@ -754,8 +869,8 @@ test.describe('Database Functions', () => {
         // Nothing
       },
       async () => {
-        await query(`drop function if exists ${databaseFunctionName}`);
-        await query(`drop function if exists ${databaseFunctionNameUpdated}`);
+        await query(`drop function if exists ${databaseFunctionName}`)
+        await query(`drop function if exists ${databaseFunctionNameUpdated}`)
       }
     )
 
