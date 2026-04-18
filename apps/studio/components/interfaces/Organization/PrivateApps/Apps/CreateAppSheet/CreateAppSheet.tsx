@@ -1,9 +1,4 @@
 import type { components } from 'api-types'
-import { usePlatformAppCreateMutation } from 'data/platform-apps/platform-app-create-mutation'
-import { usePlatformAppDeleteMutation } from 'data/platform-apps/platform-app-delete-mutation'
-import { usePlatformAppInstallationCreateMutation } from 'data/platform-apps/platform-app-installation-create-mutation'
-import { usePlatformAppSigningKeyCreateMutation } from 'data/platform-apps/platform-app-signing-key-create-mutation'
-import { useCopyToClipboard } from 'hooks/ui/useCopyToClipboard'
 import { Copy, Download, Key, Plus, RotateCcw, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -35,6 +30,11 @@ import { FormLayout } from 'ui-patterns/form/Layout/FormLayout'
 import { usePrivateApps } from '../../PrivateAppsContext'
 import { PERMISSIONS } from '../Apps.constants'
 import { CreateAppSheetStep } from './CreateAppSheetStep'
+import { usePlatformAppCreateMutation } from '@/data/platform-apps/platform-app-create-mutation'
+import { usePlatformAppDeleteMutation } from '@/data/platform-apps/platform-app-delete-mutation'
+import { usePlatformAppInstallationCreateMutation } from '@/data/platform-apps/platform-app-installation-create-mutation'
+import { usePlatformAppSigningKeyCreateMutation } from '@/data/platform-apps/platform-app-signing-key-create-mutation'
+import { useCopyToClipboard } from '@/hooks/ui/useCopyToClipboard'
 
 type CreatePlatformAppResponse = components['schemas']['CreatePlatformAppResponse']
 type CreatePlatformAppSigningKeyResponse =
@@ -212,7 +212,7 @@ export function CreateAppSheet({ visible, onClose, onCreated }: CreateAppSheetPr
                               <CommandEmpty_Shadcn_>No permissions found.</CommandEmpty_Shadcn_>
                               <CommandGroup_Shadcn_ className="[&>div]:text-left">
                                 <div className="max-h-[210px] overflow-y-auto">
-                                  {PERMISSIONS.filter((p) => p.group === 'project').map((perm) => (
+                                  {PERMISSIONS.map((perm) => (
                                     <CommandItem_Shadcn_
                                       key={perm.id}
                                       value={`${perm.id} ${perm.label}`}
