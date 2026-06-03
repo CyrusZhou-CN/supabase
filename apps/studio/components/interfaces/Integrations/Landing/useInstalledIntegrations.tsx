@@ -1,21 +1,24 @@
 import { useMemo } from 'react'
-import { parseSchemaComment } from 'stripe-experiment-sync/supabase'
 
-import { wrapperMetaComparator } from '../Wrappers/Wrappers.utils'
-import { useAvailableIntegrations } from './useAvailableIntegrations'
 import {
-  isInstalled as checkIsInstalled,
-  findStripeSchema,
-} from '@/components/interfaces/Integrations/templates/StripeSyncEngine/stripe-sync-status'
+  hasMatchingWrapper,
+  hasRequiredExtensions,
+  isOAuthInstalled,
+  isStripeSyncEngineInstalled,
+} from './Landing.utils'
+import { useAvailableIntegrations } from './useAvailableIntegrations'
 import { useAPIKeysQuery } from '@/data/api-keys/api-keys-query'
 import { useDatabaseExtensionsQuery } from '@/data/database-extensions/database-extensions-query'
 import { useSchemasQuery } from '@/data/database/schemas-query'
 import { useFDWsQuery } from '@/data/fdw/fdws-query'
+import { usePartnerIntegrationsQuery } from '@/data/partners/integration-status-query'
+import { useSecretsQuery } from '@/data/secrets/secrets-query'
 import { useSelectedProjectQuery } from '@/hooks/misc/useSelectedProject'
 import { EMPTY_ARR } from '@/lib/void'
 
 export const useInstalledIntegrations = () => {
   const { data: project } = useSelectedProjectQuery()
+
   const {
     data: allIntegrations = EMPTY_ARR,
     error: availableIntegrationsError,
@@ -33,19 +36,58 @@ export const useInstalledIntegrations = () => {
     )
   }, [allIntegrations])
 
+  const hasEdgeFunctionSecretNameIntegration = useMemo(() => {
+    return allIntegrations.some(
+      (integration) =>
+        integration.type === 'oauth' &&
+        integration.installIdentificationMethod === 'edge_function_secret_name' &&
+        !!integration.edgeFunctionSecretName
+    )
+  }, [allIntegrations])
+
+  const hasCallbackStatusIntegration = useMemo(() => {
+    return allIntegrations.some(
+      (integration) =>
+        integration.type === 'oauth' &&
+        integration.installIdentificationMethod === 'integration_status'
+    )
+  }, [allIntegrations])
+
   const {
-    data: apiKeys,
+    data: apiKeys = EMPTY_ARR,
     error: apiKeysError,
     isError: isErrorApiKeys,
     isLoading: isApiKeysLoading,
     isSuccess: isSuccessApiKeys,
   } = useAPIKeysQuery(
     { projectRef: project?.ref, reveal: false },
-    { enabled: !!project?.ref && hasSecretKeyPrefixIntegration }
+    { enabled: hasSecretKeyPrefixIntegration }
   )
 
   const {
-    data,
+    data: edgeFunctionSecrets = EMPTY_ARR,
+    error: edgeFunctionSecretsError,
+    isError: isErrorEdgeFunctionSecrets,
+    isLoading: isEdgeFunctionSecretsLoading,
+    isSuccess: isSuccessEdgeFunctionSecrets,
+  } = useSecretsQuery(
+    { projectRef: project?.ref },
+    { enabled: hasEdgeFunctionSecretNameIntegration }
+  )
+
+  const {
+    data: partnerIntegrations = EMPTY_ARR,
+    error: partnerIntegrationsError,
+    isError: isErrorPartnerIntegrations,
+    isLoading: isPartnerIntegrationsLoading,
+    isSuccess: isSuccessPartnerIntegrations,
+  } = usePartnerIntegrationsQuery(
+    { projectRef: project?.ref },
+    { enabled: hasCallbackStatusIntegration }
+  )
+
+  const {
+    data: wrappers = EMPTY_ARR,
     error: fdwError,
     isError: isErrorFDWs,
     isPending: isFDWLoading,
@@ -55,7 +97,7 @@ export const useInstalledIntegrations = () => {
     connectionString: project?.connectionString,
   })
   const {
-    data: extensions,
+    data: extensions = EMPTY_ARR,
     error: extensionsError,
     isError: isErrorExtensions,
     isPending: isExtensionsLoading,
@@ -66,7 +108,7 @@ export const useInstalledIntegrations = () => {
   })
 
   const {
-    data: schemas,
+    data: schemas = EMPTY_ARR,
     error: schemasError,
     isError: isErrorSchemas,
     isPending: isSchemasLoading,
@@ -77,70 +119,66 @@ export const useInstalledIntegrations = () => {
   })
 
   const isHooksEnabled = schemas?.some((schema) => schema.name === 'supabase_functions')
-  const wrappers = useMemo(() => data ?? EMPTY_ARR, [data])
 
   const installedIntegrations = useMemo(() => {
     return allIntegrations
       .filter((integration) => {
-        // special handling for supabase webhooks
-        if (integration.id === 'webhooks') {
-          return isHooksEnabled
-        }
-        if (integration.id === 'data_api') {
-          return true
-        }
+        if (integration.id === 'webhooks') return isHooksEnabled
+        if (integration.id === 'data_api') return true
         if (integration.id === 'stripe_sync_engine') {
-          const stripeSchema = findStripeSchema(schemas)
-          const parsedSchema = parseSchemaComment(stripeSchema?.comment)
-          return checkIsInstalled(parsedSchema.status)
+          return isStripeSyncEngineInstalled(schemas)
         }
         if (integration.type === 'wrapper') {
-          return wrappers.find((w) => wrapperMetaComparator(integration.meta, w))
+          return hasMatchingWrapper({ meta: integration.meta, wrappers })
         }
         if (integration.type === 'postgres_extension') {
-          return integration.requiredExtensions.every((extName) => {
-            const foundExtension = (extensions ?? []).find((ext) => ext.name === extName)
-            return !!foundExtension?.installed_version
-          })
+          return hasRequiredExtensions({ integration, extensions })
         }
         if (integration.type === 'oauth') {
-          const prefix = integration.secretKeyPrefix
-
-          if (integration.installIdentificationMethod !== 'secret_key_prefix' || !prefix) {
-            return false
-          }
-
-          return (apiKeys ?? []).some((key) => key.type === 'secret' && key.name.startsWith(prefix))
+          return isOAuthInstalled({
+            integration,
+            apiKeys,
+            partnerIntegrations,
+            secrets: edgeFunctionSecrets,
+          })
         }
         return false
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [allIntegrations, wrappers, extensions, schemas, isHooksEnabled, apiKeys])
+  }, [allIntegrations, wrappers, extensions, schemas, isHooksEnabled, apiKeys, edgeFunctionSecrets])
 
   const error =
     fdwError ||
     extensionsError ||
     schemasError ||
     availableIntegrationsError ||
-    (hasSecretKeyPrefixIntegration ? apiKeysError : null)
+    (hasSecretKeyPrefixIntegration ? apiKeysError : null) ||
+    (hasEdgeFunctionSecretNameIntegration ? edgeFunctionSecretsError : null) ||
+    (hasCallbackStatusIntegration ? partnerIntegrationsError : null)
   const isLoading =
     isSchemasLoading ||
     isFDWLoading ||
     isExtensionsLoading ||
     isAvailableIntegrationsLoading ||
-    (hasSecretKeyPrefixIntegration && isApiKeysLoading)
+    (hasSecretKeyPrefixIntegration && isApiKeysLoading) ||
+    (hasEdgeFunctionSecretNameIntegration && isEdgeFunctionSecretsLoading) ||
+    (hasCallbackStatusIntegration && isPartnerIntegrationsLoading)
   const isError =
     isErrorFDWs ||
     isErrorExtensions ||
     isErrorSchemas ||
     isErrorAvailableIntegrations ||
-    (hasSecretKeyPrefixIntegration && isErrorApiKeys)
+    (hasSecretKeyPrefixIntegration && isErrorApiKeys) ||
+    (hasEdgeFunctionSecretNameIntegration && isErrorEdgeFunctionSecrets) ||
+    (hasCallbackStatusIntegration && isErrorPartnerIntegrations)
   const isSuccess =
     isSuccessFDWs &&
     isSuccessExtensions &&
     isSuccessSchemas &&
     isSuccessAvailableIntegrations &&
-    (!hasSecretKeyPrefixIntegration || isSuccessApiKeys)
+    (!hasSecretKeyPrefixIntegration || isSuccessApiKeys) &&
+    (!hasEdgeFunctionSecretNameIntegration || isSuccessEdgeFunctionSecrets) &&
+    (!hasCallbackStatusIntegration || isSuccessPartnerIntegrations)
 
   return {
     // show all integrations at once instead of showing partial results

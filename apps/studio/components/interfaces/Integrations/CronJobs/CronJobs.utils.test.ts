@@ -1,7 +1,28 @@
 import { describe, expect, it } from 'vitest'
 
 import { cronPattern, secondsPattern } from './CronJobs.constants'
-import { formatCronJobColumns, parseCronJobCommand } from './CronJobs.utils'
+import {
+  buildCronCreateQuery,
+  buildCronUpdateQuery,
+  formatCronJobColumns,
+  parseCronJobCommand,
+} from './CronJobs.utils'
+
+describe('buildCronQuery', () => {
+  it('uses cron.schedule to create a job by name', () => {
+    expect(buildCronCreateQuery('my-job', '*/5 * * * *', 'select 1')).toBe(
+      "select cron.schedule('my-job', '*/5 * * * *', 'select 1');"
+    )
+  })
+})
+
+describe('buildCronUpdateQuery', () => {
+  it('uses cron.alter_job to update a job by id', () => {
+    expect(buildCronUpdateQuery(42, '*/10 * * * *', 'select 2')).toBe(
+      "select cron.alter_job(job_id := 42, schedule := '*/10 * * * *', command := 'select 2');"
+    )
+  })
+})
 
 describe('parseCronJobCommand', () => {
   it('should return a default object when the command is null', () => {
@@ -48,6 +69,16 @@ describe('parseCronJobCommand', () => {
       type: 'sql_function',
       schema: 'random_schema',
       functionName: 'function_1',
+      snippet: command,
+    })
+  })
+
+  it('should return a sql function command for lowercase select', () => {
+    const command = 'select lowercase.issue ()'
+    expect(parseCronJobCommand(command, 'random_project_ref')).toStrictEqual({
+      type: 'sql_function',
+      schema: 'lowercase',
+      functionName: 'issue',
       snippet: command,
     })
   })
@@ -165,13 +196,13 @@ describe('parseCronJobCommand', () => {
   })
 
   it('should return an HTTP request config with POST method, some headers and empty body', () => {
-    const command = `select net.http_post( url:='https://example.com/api/endpoint', headers:=jsonb_build_object('fst', '1', 'snd', '2'), body:='', timeout_milliseconds:=1000 );`
+    const command = `select net.http_post( url:='https://example.com/api/endpoint', headers:=jsonb_build_object('fst', '1', 'snd', 'O''Reilly'), body:='', timeout_milliseconds:=1000 );`
     expect(parseCronJobCommand(command, 'random_project_ref')).toStrictEqual({
       endpoint: 'https://example.com/api/endpoint',
       method: 'POST',
       httpHeaders: [
         { name: 'fst', value: '1' },
-        { name: 'snd', value: '2' },
+        { name: 'snd', value: "O'Reilly" },
       ],
       httpBody: '',
       timeoutMs: 1000,
@@ -222,17 +253,30 @@ describe('parseCronJobCommand', () => {
     })
   })
 
-  it('should return an HTTP request config with POST method, plain JSON headers and plain JSON body with ::jsonb typecasting', () => {
-    const command = `select net.http_post( url:='https://example.com/api/endpoint', headers:='{"fst": "1", "snd": "2"}'::jsonb,body:='{"key": "value"}'::jsonb,timeout_milliseconds:=5000);`
+  it('should return an HTTP request config with POST method, plain JSON headers and plain JSON body with escaped SQL strings and ::jsonb typecasting', () => {
+    const command = `select net.http_post( url:='https://example.com/api/endpoint', headers:='{"X-Name":"O''Reilly"}'::jsonb,body:='{"message":"hello  there","name":"O''Reilly"}'::jsonb,timeout_milliseconds:=5000);`
+    expect(parseCronJobCommand(command, 'random_project_ref')).toStrictEqual({
+      endpoint: 'https://example.com/api/endpoint',
+      method: 'POST',
+      httpHeaders: [{ name: 'X-Name', value: "O'Reilly" }],
+      httpBody: `{"message":"hello  there","name":"O'Reilly"}`,
+      timeoutMs: 5000,
+      type: 'http_request',
+      snippet: command,
+    })
+  })
+
+  it('should return an HTTP request config with POST method, escape-string headers and body with backslashes', () => {
+    const command = String.raw`select net.http_post( url:='https://example.com/api/endpoint', headers:=E'{"Content-Type":"application/json","X-Regex":"^\\\\d+$"}'::jsonb,body:=E'{"path":"C:\\\\tmp","regex":"^\\\\d+$"}',timeout_milliseconds:=1000);`
     expect(parseCronJobCommand(command, 'random_project_ref')).toStrictEqual({
       endpoint: 'https://example.com/api/endpoint',
       method: 'POST',
       httpHeaders: [
-        { name: 'fst', value: '1' },
-        { name: 'snd', value: '2' },
+        { name: 'Content-Type', value: 'application/json' },
+        { name: 'X-Regex', value: String.raw`^\d+$` },
       ],
-      httpBody: '{"key": "value"}',
-      timeoutMs: 5000,
+      httpBody: String.raw`{"path":"C:\\tmp","regex":"^\\d+$"}`,
+      timeoutMs: 1000,
       type: 'http_request',
       snippet: command,
     })

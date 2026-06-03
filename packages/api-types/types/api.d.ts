@@ -345,8 +345,6 @@ export interface paths {
     /**
      * List all projects
      * @description Returns a list of all projects you've previously created.
-     *
-     *     Use `/v1/organizations/{slug}/projects` instead when possible to get more precise results and pagination support.
      */
     get: operations['v1-list-all-projects']
     put?: never
@@ -1155,6 +1153,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/projects/{ref}/database/backups/restore': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Restores a physical backup for a database */
+    post: operations['v1-restore-physical-backup']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/projects/{ref}/database/backups/restore-pitr': {
     parameters: {
       query?: never
@@ -1188,6 +1203,27 @@ export interface paths {
     options?: never
     head?: never
     patch?: never
+    trace?: never
+  }
+  '/v1/projects/{ref}/database/backups/schedule': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Gets the backup schedule for a project */
+    get: operations['v1-get-backup-schedule']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /**
+     * Updates the backup schedule time for a project
+     * @description Sets the time at which the daily backup runs. The change takes effect on the next backup window that includes the new time. If the new time has already passed for today, the first backup at the new time will occur the following day. It can only be updated 3 times per 24 hours.
+     */
+    patch: operations['v1-update-backup-schedule']
     trace?: never
   }
   '/v1/projects/{ref}/database/backups/undo': {
@@ -1564,9 +1600,9 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** [Beta] Get project's just-in-time access configuration. */
+    /** [Beta] Get project's temporary access configuration. */
     get: operations['v1-get-jit-access-config']
-    /** [Beta] Update project's just-in-time access configuration. */
+    /** [Beta] Update project's temporary access configuration. */
     put: operations['v1-update-jit-access-config']
     post?: never
     delete?: never
@@ -2488,7 +2524,11 @@ export interface components {
       project_ref: string
       /** Format: date-time */
       review_requested_at?: string
-      /** @enum {string} */
+      /**
+       * @deprecated
+       * @description This field is deprecated. List action runs to get branch status instead.
+       * @enum {string}
+       */
       status:
         | 'CREATING_PROJECT'
         | 'RUNNING_MIGRATIONS'
@@ -3094,7 +3134,7 @@ export interface components {
      *     } */
     JitAccessRequestRequest: {
       /** @enum {string} */
-      state: 'enabled' | 'disabled' | 'unavailable'
+      state: 'enabled' | 'disabled'
     }
     JitAccessResponse: {
       /** Format: uuid */
@@ -3108,6 +3148,7 @@ export interface components {
             cidr: string
           }[]
         }
+        branches_only?: boolean
         expires_at?: number
         role: string
       }[]
@@ -3124,6 +3165,7 @@ export interface components {
             cidr: string
           }[]
         }
+        branches_only?: boolean
         expires_at?: number
         role: string
       }
@@ -3141,11 +3183,27 @@ export interface components {
               cidr: string
             }[]
           }
+          branches_only?: boolean
           expires_at?: number
           role: string
         }[]
       }[]
     }
+    JitStateResponse:
+      | {
+          appliedSuccessfully?: boolean
+          /** @enum {string} */
+          state: 'enabled' | 'disabled'
+        }
+      | {
+          /** @enum {string} */
+          state: 'unavailable'
+          /** @enum {string} */
+          unavailableReason:
+            | 'manual_migration_required'
+            | 'postgres_upgrade_required'
+            | 'temporarily_unavailable'
+        }
     LegacyApiKeysResponse: {
       enabled: boolean
     }
@@ -3715,7 +3773,19 @@ export interface components {
             /** @enum {string} */
             type: 'active_replication_slot'
           }
+        | {
+            /** @enum {string} */
+            type: 'x86_architecture'
+          }
+        | {
+            /** @enum {string} */
+            type: 'project_hibernating'
+          }
       )[]
+      warnings: {
+        /** @enum {string} */
+        type: 'pg_graphql_introspection_change'
+      }[]
     }
     ProjectUpgradeInitiateResponse: {
       tracking_id: string
@@ -4404,7 +4474,8 @@ export interface components {
      *                 "cidr": "203.0.113.0/24"
      *               }
      *             ]
-     *           }
+     *           },
+     *           "branches_only": false
      *         }
      *       ]
      *     } */
@@ -4418,6 +4489,7 @@ export interface components {
             cidr: string
           }[]
         }
+        branches_only?: boolean
         expires_at?: number
         role: string
       }[]
@@ -4651,8 +4723,22 @@ export interface components {
       release_channel?: 'internal' | 'alpha' | 'beta' | 'ga' | 'withdrawn' | 'preview'
       target_version: string
     }
+    V1BackupScheduleResponse: {
+      /**
+       * @description Time of day to schedule daily backups, in UTC. Format: HH:MM:SS.
+       * @example 04:00:00
+       */
+      schedule_for: string
+      /**
+       * Format: date-time
+       * @description Timestamp of when the backup schedule was last updated.
+       * @example 2026-05-04T14:40:44+00:00
+       */
+      updated_at: string
+    }
     V1BackupsResponse: {
       backups: {
+        id: number
         inserted_at: string
         is_physical_backup: boolean
         /** @enum {string} */
@@ -4896,6 +4982,7 @@ export interface components {
             | 'security.audit_logs_days'
             | 'security.questionnaire'
             | 'security.soc2_report'
+            | 'security.iso27001_certificate'
             | 'security.private_link'
             | 'security.enforce_mfa'
             | 'log.retention_days'
@@ -4904,6 +4991,7 @@ export interface components {
             | 'ipv4'
             | 'pitr.available_variants'
             | 'log_drains'
+            | 'audit_log_drains'
             | 'branching_limit'
             | 'branching_persistent'
             | 'auth.mfa_phone'
@@ -4918,8 +5006,10 @@ export interface components {
             | 'auth.advanced_auth_settings'
             | 'auth.performance_settings'
             | 'auth.password_hibp'
+            | 'auth.custom_oauth.max_providers'
             | 'backup.retention_days'
             | 'backup.restore_to_new_project'
+            | 'backup.schedule'
             | 'function.max_count'
             | 'function.size_limit_mb'
             | 'realtime.max_concurrent_users'
@@ -4950,54 +5040,6 @@ export interface components {
       name?: string
       version: string
     }[]
-    V1ListProjectsPaginatedResponse: {
-      pagination: {
-        /** @description Total number of projects. Use this to calculate the total number of pages. */
-        count: number
-        /** @description Maximum number of projects per page (actual number may be less) */
-        limit: number
-        /** @description Number of projects skipped in this response */
-        offset: number
-      }
-      projects: {
-        cloud_provider: string
-        disk_volume_size_gb?: number
-        id: number
-        /** @enum {string} */
-        infra_compute_size?:
-          | 'pico'
-          | 'nano'
-          | 'micro'
-          | 'small'
-          | 'medium'
-          | 'large'
-          | 'xlarge'
-          | '2xlarge'
-          | '4xlarge'
-          | '8xlarge'
-          | '12xlarge'
-          | '16xlarge'
-          | '24xlarge'
-          | '24xlarge_optimized_memory'
-          | '24xlarge_optimized_cpu'
-          | '24xlarge_high_memory'
-          | '48xlarge'
-          | '48xlarge_optimized_memory'
-          | '48xlarge_optimized_cpu'
-          | '48xlarge_high_memory'
-        inserted_at: string | null
-        is_branch_enabled: boolean
-        is_physical_backups_enabled: boolean | null
-        name: string
-        organization_id: number
-        organization_slug: string
-        preview_branch_refs: string[]
-        ref: string
-        region: string
-        status: string
-        subscription_id: string | null
-      }[]
-    }
     V1OrganizationMemberResponse: {
       email?: string
       mfa_enabled: boolean
@@ -5216,6 +5258,12 @@ export interface components {
       query: string
     }
     /** @example {
+     *       "id": 12345
+     *     } */
+    V1RestoreBackupBody: {
+      id: number
+    }
+    /** @example {
      *       "recovery_time_target_unix": 1740787200
      *     } */
     V1RestorePitrBody: {
@@ -5297,6 +5345,16 @@ export interface components {
      *     } */
     V1UndoBody: {
       name: string
+    }
+    /** @example {
+     *       "schedule_for": "04:00:00"
+     *     } */
+    V1UpdateBackupScheduleBody: {
+      /**
+       * @description Time of day to schedule daily backups, in UTC. Format: HH:MM:SS.
+       * @example 04:00:00
+       */
+      schedule_for: string
     }
     /** @example {
      *       "name": "Hello World",
@@ -5674,6 +5732,27 @@ export interface operations {
         }
         content?: never
       }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Forbidden action */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Rate limit exceeded */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
     }
   }
   'v1-revoke-token': {
@@ -5737,6 +5816,27 @@ export interface operations {
           'application/json': components['schemas']['OrganizationResponseV1'][]
         }
       }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Forbidden action */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Rate limit exceeded */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
       /** @description Unexpected error listing organizations */
       500: {
         headers: {
@@ -5766,6 +5866,27 @@ export interface operations {
         content: {
           'application/json': components['schemas']['OrganizationResponseV1']
         }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Forbidden action */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Rate limit exceeded */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
       /** @description Unexpected error creating an organization */
       500: {
@@ -6003,6 +6124,27 @@ export interface operations {
           'application/json': components['schemas']['OrganizationProjectsResponse']
         }
       }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Forbidden action */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Rate limit exceeded */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
       /** @description Failed to retrieve projects */
       500: {
         headers: {
@@ -6048,6 +6190,27 @@ export interface operations {
           'application/json': components['schemas']['V1ProjectWithDatabaseResponse'][]
         }
       }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Forbidden action */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Rate limit exceeded */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
     }
   }
   'v1-create-a-project': {
@@ -6070,6 +6233,27 @@ export interface operations {
         content: {
           'application/json': components['schemas']['V1ProjectResponse']
         }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Forbidden action */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Rate limit exceeded */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
     }
   }
@@ -7301,27 +7485,6 @@ export interface operations {
           'application/json': components['schemas']['BranchResponse'][]
         }
       }
-      /** @description Unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      /** @description Forbidden action */
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      /** @description Rate limit exceeded */
-      429: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
       /** @description Failed to retrieve database branches */
       500: {
         headers: {
@@ -7354,27 +7517,6 @@ export interface operations {
         content: {
           'application/json': components['schemas']['BranchResponse']
         }
-      }
-      /** @description Unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      /** @description Forbidden action */
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      /** @description Rate limit exceeded */
-      429: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
       }
       /** @description Failed to create database branch */
       500: {
@@ -7453,27 +7595,6 @@ export interface operations {
         content: {
           'application/json': components['schemas']['BranchResponse']
         }
-      }
-      /** @description Unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      /** @description Forbidden action */
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      /** @description Rate limit exceeded */
-      429: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
       }
       /** @description Failed to fetch database branch */
       500: {
@@ -9322,7 +9443,10 @@ export interface operations {
   }
   'v1-Delete hostname config': {
     parameters: {
-      query?: never
+      query?: {
+        /** @description If true, also removes the custom domain add-on from the project subscription. */
+        remove_addon?: boolean
+      }
       header?: never
       path: {
         /** @description Project ref */
@@ -9572,6 +9696,51 @@ export interface operations {
       }
     }
   }
+  'v1-restore-physical-backup': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description Project ref */
+        ref: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['V1RestoreBackupBody']
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Forbidden action */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Rate limit exceeded */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
   'v1-restore-pitr-backup': {
     parameters: {
       query?: never
@@ -9709,6 +9878,145 @@ export interface operations {
       }
       /** @description Rate limit exceeded */
       429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  'v1-get-backup-schedule': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description Project ref */
+        ref: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['V1BackupScheduleResponse']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Feature requires a higher plan */
+      402: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Forbidden action */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Project or backup schedule not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Rate limit exceeded */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Failed to retrieve backup schedule */
+      500: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  'v1-update-backup-schedule': {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description Project ref */
+        ref: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['V1UpdateBackupScheduleBody']
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['V1BackupScheduleResponse']
+        }
+      }
+      /** @description Invalid schedule_for format */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Feature requires a higher plan */
+      402: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Forbidden action */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Project or backup schedule not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Rate limit exceeded */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Failed to update backup schedule */
+      500: {
         headers: {
           [name: string]: unknown
         }
@@ -11183,7 +11491,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['JitAccessResponse']
+          'application/json': components['schemas']['JitStateResponse']
         }
       }
       /** @description Unauthorized */
@@ -11207,7 +11515,7 @@ export interface operations {
         }
         content?: never
       }
-      /** @description Failed to retrieve project's JIT access config */
+      /** @description Failed to retrieve project's temporary access configuration. */
       500: {
         headers: {
           [name: string]: unknown
@@ -11237,7 +11545,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['JitAccessResponse']
+          'application/json': components['schemas']['JitStateResponse']
         }
       }
       /** @description Unauthorized */
@@ -11261,7 +11569,7 @@ export interface operations {
         }
         content?: never
       }
-      /** @description Failed to update project's just-in-time access configuration. */
+      /** @description Failed to update project's temporary access configuration. */
       500: {
         headers: {
           [name: string]: unknown
@@ -12947,6 +13255,27 @@ export interface operations {
           'application/json': components['schemas']['SnippetList']
         }
       }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Forbidden action */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Rate limit exceeded */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
       /** @description Failed to list user's SQL snippets */
       500: {
         headers: {
@@ -12974,6 +13303,27 @@ export interface operations {
         content: {
           'application/json': components['schemas']['SnippetResponse']
         }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Forbidden action */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Rate limit exceeded */
+      429: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
       /** @description Failed to retrieve SQL snippet */
       500: {

@@ -4,13 +4,13 @@ import { useParams } from 'common'
 import { Check } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useQueryState } from 'nuqs'
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import ReactMarkdown from 'react-markdown'
 import { toast } from 'sonner'
 import {
   Button,
-  Form_Shadcn_,
+  Form,
   Sheet,
   SheetContent,
   SheetFooter,
@@ -36,7 +36,6 @@ import { useProjectApiUrl } from '@/data/config/project-endpoint-query'
 import { useHasEntitlementAccess } from '@/hooks/misc/useCheckEntitlements'
 import { useAsyncCheckPermissions } from '@/hooks/misc/useCheckPermissions'
 import { useSelectedOrganizationQuery } from '@/hooks/misc/useSelectedOrganization'
-import { useStaticEffectEvent } from '@/hooks/useStaticEffectEvent'
 import { BASE_PATH } from '@/lib/constants'
 
 interface ProviderFormProps {
@@ -84,7 +83,7 @@ export const ProviderForm = ({ config, provider, isActive }: ProviderFormProps) 
 
   const hasEntitlementAccess = useHasEntitlementAccess()
 
-  const getValuesForProvider = useStaticEffectEvent(
+  const getValuesForProvider = useCallback(
     (config: components['schemas']['GoTrueConfigResponse']) => {
       const values: { [x: string]: string | boolean } = {}
       Object.keys(provider.properties).forEach((key) => {
@@ -112,7 +111,8 @@ export const ProviderForm = ({ config, provider, isActive }: ProviderFormProps) 
         }
       })
       return values
-    }
+    },
+    [provider]
   )
 
   const INITIAL_VALUES = useMemo(() => {
@@ -216,11 +216,11 @@ export const ProviderForm = ({ config, provider, isActive }: ProviderFormProps) 
             />
             <SheetTitle>{provider.title}</SheetTitle>
           </SheetHeader>
-          <Form_Shadcn_ {...form}>
+          <Form {...form}>
             <form
               id={formId}
               name={formId}
-              className="overflow-y-auto flex-grow px-0"
+              className="overflow-y-auto grow px-0"
               onSubmit={form.handleSubmit(onSubmit)}
             >
               <AuthAlert
@@ -273,7 +273,7 @@ export const ProviderForm = ({ config, provider, isActive }: ProviderFormProps) 
                 </SheetSection>
               )}
             </form>
-          </Form_Shadcn_>
+          </Form>
           <SheetFooter className="shrink-0">
             <div className="flex items-center justify-between w-full">
               <DocsButton href={provider.link} />

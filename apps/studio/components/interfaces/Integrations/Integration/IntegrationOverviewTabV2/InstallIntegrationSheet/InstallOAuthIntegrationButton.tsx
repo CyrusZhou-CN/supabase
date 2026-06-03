@@ -6,6 +6,8 @@ import { Button } from 'ui'
 import type { IntegrationDefinition } from '@/components/interfaces/Integrations/Landing/Integrations.constants'
 import { useAPIKeysQuery } from '@/data/api-keys/api-keys-query'
 import { useInstallOAuthIntegrationMutation } from '@/data/marketplace/install-oauth-integration-mutation'
+import { usePartnerIntegrationsQuery } from '@/data/partners/integration-status-query'
+import { useSecretsQuery } from '@/data/secrets/secrets-query'
 
 interface InstallOAuthIntegrationButtonProps {
   integration: IntegrationDefinition
@@ -14,10 +16,28 @@ interface InstallOAuthIntegrationButtonProps {
 export function InstallOAuthIntegrationButton({ integration }: InstallOAuthIntegrationButtonProps) {
   const { ref: projectRef } = useParams()
 
+  const requiresApiKeysCheck =
+    integration.installIdentificationMethod === 'secret_key_prefix' && !!integration.secretKeyPrefix
+
+  const requiresEdgeFunctionSecretsCheck =
+    integration.installIdentificationMethod === 'edge_function_secret_name' &&
+    !!integration.edgeFunctionSecretName
+
+  const requiresPartnerIntegrationsCheck =
+    integration.installIdentificationMethod === 'integration_status'
+
   const { data: apiKeys, isLoading: isApiKeysLoading } = useAPIKeysQuery(
     { projectRef, reveal: false },
-    { enabled: !!projectRef }
+    { enabled: requiresApiKeysCheck }
   )
+
+  const { data: edgeFunctionSecrets, isPending: isEdgeFunctionSecretsLoading } = useSecretsQuery(
+    { projectRef },
+    { enabled: requiresEdgeFunctionSecretsCheck }
+  )
+
+  const { data: partnerIntegrations, isPending: isPartnerIntegrationsLoading } =
+    usePartnerIntegrationsQuery({ projectRef }, { enabled: requiresPartnerIntegrationsCheck })
 
   const { mutate: installOAuthIntegration, isPending: isInstalling } =
     useInstallOAuthIntegrationMutation({
@@ -27,7 +47,7 @@ export function InstallOAuthIntegrationButton({ integration }: InstallOAuthInteg
             toast.error('Failed to redirect because redirect URL is invalid')
             return
           }
-          window.location.href = data.redirectUrl
+          window.open(data.redirectUrl, '_blank', 'noreferrer')
         } else {
           toast.error('Failed to start integration installation')
         }
@@ -35,28 +55,48 @@ export function InstallOAuthIntegrationButton({ integration }: InstallOAuthInteg
     })
 
   const isLoading =
-    integration.installIdentificationMethod === 'secret_key_prefix' && isApiKeysLoading
+    (requiresApiKeysCheck && isApiKeysLoading) ||
+    (requiresEdgeFunctionSecretsCheck && isEdgeFunctionSecretsLoading) ||
+    (requiresPartnerIntegrationsCheck && isPartnerIntegrationsLoading)
 
   const isIntegrationInstalled = useMemo(() => {
     if (!integration) return false
 
-    const prefix = integration.secretKeyPrefix
+    if (integration.installIdentificationMethod === 'secret_key_prefix') {
+      const prefix = integration.secretKeyPrefix
+      if (!prefix || isApiKeysLoading || !apiKeys) return false
+      return apiKeys.some((k) => k.type === 'secret' && k.name.startsWith(prefix))
+    }
 
-    if (integration.installIdentificationMethod !== 'secret_key_prefix' || !prefix) return false
-    if (isApiKeysLoading || !apiKeys) return false
+    if (integration.installIdentificationMethod === 'edge_function_secret_name') {
+      const secretName = integration.edgeFunctionSecretName
+      if (!secretName || isEdgeFunctionSecretsLoading || !edgeFunctionSecrets) return false
+      return edgeFunctionSecrets.some((secret) => secret.name === secretName)
+    }
 
-    return apiKeys.some((k) => k.type === 'secret' && k.name.startsWith(prefix))
-  }, [apiKeys, integration, isApiKeysLoading])
+    if (integration.installIdentificationMethod === 'integration_status') {
+      if (isPartnerIntegrationsLoading || !partnerIntegrations) return false
+      return partnerIntegrations.some(
+        (i) => i.listing_slug === integration.id && i.status === 'ready'
+      )
+    }
+
+    return false
+  }, [
+    apiKeys,
+    edgeFunctionSecrets,
+    partnerIntegrations,
+    integration,
+    isApiKeysLoading,
+    isEdgeFunctionSecretsLoading,
+    isPartnerIntegrationsLoading,
+  ])
 
   const handleInstallClick = async () => {
     if (!integration || !projectRef) return
+    if (!integration.id) return toast.error('Listing ID is required')
 
-    if (integration.installUrlType === 'post') {
-      if (!integration.listingId) return toast.error('Listing ID is required')
-      installOAuthIntegration({ projectRef, id: integration.listingId })
-    } else {
-      window.location.href = integration.installUrl ?? '/'
-    }
+    installOAuthIntegration({ projectRef, listingSlug: integration.id })
   }
 
   return (
