@@ -1,3 +1,4 @@
+import { PermissionAction } from '@supabase/shared-types/out/constants'
 import { useMemo } from 'react'
 
 import {
@@ -5,19 +6,30 @@ import {
   hasRequiredExtensions,
   isOAuthInstalled,
   isStripeSyncEngineInstalled,
+  useProjectOAuthIntegrationData,
 } from './Landing.utils'
 import { useAvailableIntegrations } from './useAvailableIntegrations'
-import { useAPIKeysQuery } from '@/data/api-keys/api-keys-query'
 import { useDatabaseExtensionsQuery } from '@/data/database-extensions/database-extensions-query'
 import { useSchemasQuery } from '@/data/database/schemas-query'
 import { useFDWsQuery } from '@/data/fdw/fdws-query'
-import { usePartnerIntegrationsQuery } from '@/data/partners/integration-status-query'
-import { useSecretsQuery } from '@/data/secrets/secrets-query'
+import { useAsyncCheckPermissions } from '@/hooks/misc/useCheckPermissions'
+import { useSelectedOrganizationQuery } from '@/hooks/misc/useSelectedOrganization'
 import { useSelectedProjectQuery } from '@/hooks/misc/useSelectedProject'
 import { EMPTY_ARR } from '@/lib/void'
 
 export const useInstalledIntegrations = () => {
   const { data: project } = useSelectedProjectQuery()
+  const { data: org } = useSelectedOrganizationQuery()
+
+  const { can: canReadOAuthApps } = useAsyncCheckPermissions(
+    PermissionAction.READ,
+    'oauth_apps',
+    undefined,
+    {
+      organizationSlug: org?.slug,
+      projectRef: null,
+    }
+  )
 
   const {
     data: allIntegrations = EMPTY_ARR,
@@ -27,64 +39,17 @@ export const useInstalledIntegrations = () => {
     isError: isErrorAvailableIntegrations,
   } = useAvailableIntegrations()
 
-  const hasSecretKeyPrefixIntegration = useMemo(() => {
-    return allIntegrations.some(
-      (integration) =>
-        integration.type === 'oauth' &&
-        integration.installIdentificationMethod === 'secret_key_prefix' &&
-        !!integration.secretKeyPrefix
-    )
-  }, [allIntegrations])
-
-  const hasEdgeFunctionSecretNameIntegration = useMemo(() => {
-    return allIntegrations.some(
-      (integration) =>
-        integration.type === 'oauth' &&
-        integration.installIdentificationMethod === 'edge_function_secret_name' &&
-        !!integration.edgeFunctionSecretName
-    )
-  }, [allIntegrations])
-
-  const hasCallbackStatusIntegration = useMemo(() => {
-    return allIntegrations.some(
-      (integration) =>
-        integration.type === 'oauth' &&
-        integration.installIdentificationMethod === 'integration_status'
-    )
+  const hasOAuthIntegration = useMemo(() => {
+    return allIntegrations.some((integration) => integration.type === 'oauth')
   }, [allIntegrations])
 
   const {
-    data: apiKeys = EMPTY_ARR,
-    error: apiKeysError,
-    isError: isErrorApiKeys,
-    isLoading: isApiKeysLoading,
-    isSuccess: isSuccessApiKeys,
-  } = useAPIKeysQuery(
-    { projectRef: project?.ref, reveal: false },
-    { enabled: hasSecretKeyPrefixIntegration }
-  )
-
-  const {
-    data: edgeFunctionSecrets = EMPTY_ARR,
-    error: edgeFunctionSecretsError,
-    isError: isErrorEdgeFunctionSecrets,
-    isLoading: isEdgeFunctionSecretsLoading,
-    isSuccess: isSuccessEdgeFunctionSecrets,
-  } = useSecretsQuery(
-    { projectRef: project?.ref },
-    { enabled: hasEdgeFunctionSecretNameIntegration }
-  )
-
-  const {
-    data: partnerIntegrations = EMPTY_ARR,
-    error: partnerIntegrationsError,
-    isError: isErrorPartnerIntegrations,
-    isLoading: isPartnerIntegrationsLoading,
-    isSuccess: isSuccessPartnerIntegrations,
-  } = usePartnerIntegrationsQuery(
-    { projectRef: project?.ref },
-    { enabled: hasCallbackStatusIntegration }
-  )
+    data: oauthData,
+    error: oauthDataError,
+    isError: isErrorOAuthData,
+    isLoading: isOAuthDataLoading,
+    isSuccess: isSuccessOAuthData,
+  } = useProjectOAuthIntegrationData(project?.ref, { enabled: hasOAuthIntegration })
 
   const {
     data: wrappers = EMPTY_ARR,
@@ -118,13 +83,17 @@ export const useInstalledIntegrations = () => {
     connectionString: project?.connectionString,
   })
 
-  const isHooksEnabled = schemas?.some((schema) => schema.name === 'supabase_functions')
+  const isHooksEnabled = schemas.some((schema) => schema.name === 'supabase_functions')
 
   const installedIntegrations = useMemo(() => {
     return allIntegrations
       .filter((integration) => {
         if (integration.id === 'webhooks') return isHooksEnabled
         if (integration.id === 'data_api') return true
+        // Availability is already gated by the org allow-list in `useAvailableIntegrations`, and
+        // whether Warehouse is set up on this project is handled inside its tabs, following the same split
+        // Data API uses.
+        if (integration.id === 'warehouse') return true
         if (integration.id === 'stripe_sync_engine') {
           return isStripeSyncEngineInstalled(schemas)
         }
@@ -137,48 +106,38 @@ export const useInstalledIntegrations = () => {
         if (integration.type === 'oauth') {
           return isOAuthInstalled({
             integration,
-            apiKeys,
-            partnerIntegrations,
-            secrets: edgeFunctionSecrets,
+            projectData: oauthData,
           })
         }
         return false
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [allIntegrations, wrappers, extensions, schemas, isHooksEnabled, apiKeys, edgeFunctionSecrets])
+  }, [allIntegrations, wrappers, extensions, schemas, isHooksEnabled, oauthData])
 
   const error =
     fdwError ||
     extensionsError ||
     schemasError ||
     availableIntegrationsError ||
-    (hasSecretKeyPrefixIntegration ? apiKeysError : null) ||
-    (hasEdgeFunctionSecretNameIntegration ? edgeFunctionSecretsError : null) ||
-    (hasCallbackStatusIntegration ? partnerIntegrationsError : null)
+    (canReadOAuthApps && hasOAuthIntegration ? oauthDataError : null)
   const isLoading =
     isSchemasLoading ||
     isFDWLoading ||
     isExtensionsLoading ||
     isAvailableIntegrationsLoading ||
-    (hasSecretKeyPrefixIntegration && isApiKeysLoading) ||
-    (hasEdgeFunctionSecretNameIntegration && isEdgeFunctionSecretsLoading) ||
-    (hasCallbackStatusIntegration && isPartnerIntegrationsLoading)
+    (hasOAuthIntegration && canReadOAuthApps && isOAuthDataLoading)
   const isError =
     isErrorFDWs ||
     isErrorExtensions ||
     isErrorSchemas ||
     isErrorAvailableIntegrations ||
-    (hasSecretKeyPrefixIntegration && isErrorApiKeys) ||
-    (hasEdgeFunctionSecretNameIntegration && isErrorEdgeFunctionSecrets) ||
-    (hasCallbackStatusIntegration && isErrorPartnerIntegrations)
+    (hasOAuthIntegration && canReadOAuthApps && isErrorOAuthData)
   const isSuccess =
     isSuccessFDWs &&
     isSuccessExtensions &&
     isSuccessSchemas &&
     isSuccessAvailableIntegrations &&
-    (!hasSecretKeyPrefixIntegration || isSuccessApiKeys) &&
-    (!hasEdgeFunctionSecretNameIntegration || isSuccessEdgeFunctionSecrets) &&
-    (!hasCallbackStatusIntegration || isSuccessPartnerIntegrations)
+    (!hasOAuthIntegration || !canReadOAuthApps || isSuccessOAuthData)
 
   return {
     // show all integrations at once instead of showing partial results

@@ -19,7 +19,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from 'ui'
-import { Admonition } from 'ui-patterns/admonition'
+import { Admonition } from 'ui-patterns/Admonition'
 import { CodeBlock } from 'ui-patterns/CodeBlock'
 
 import { CLEANUP_INTERVALS } from './CronJobsTab.constants'
@@ -77,7 +77,7 @@ const CronJobRunDetailsOverflowDialog = ({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button type="default">Learn more</Button>
+        <Button>Learn more</Button>
       </DialogTrigger>
       <DialogContent
         aria-describedby={undefined}
@@ -156,11 +156,7 @@ const CronJobRunDetailsOverflowDialog = ({
                     </SelectContent>
                   </Select>
                 </div>
-                <Button
-                  type="default"
-                  disabled={isBusy}
-                  onClick={() => runBatchedDeletion(cleanupInterval)}
-                >
+                <Button disabled={isBusy} onClick={() => runBatchedDeletion(cleanupInterval)}>
                   Delete rows now
                 </Button>
               </div>
@@ -188,7 +184,6 @@ const CronJobRunDetailsOverflowDialog = ({
                 <Button
                   block
                   size="small"
-                  type="default"
                   className="mt-1"
                   loading={isScheduling}
                   disabled={isScheduling}
@@ -232,7 +227,7 @@ const DeletionProgress = ({ progress, onCancel }: DeletionProgressProps) => {
         <span className="text-xs text-foreground-light">
           Deleted {totalRowsDeleted.toLocaleString()} rows so far...
         </span>
-        <Button type="outline" size="tiny" onClick={onCancel}>
+        <Button variant="outline" size="tiny" onClick={onCancel}>
           Cancel
         </Button>
       </div>
@@ -262,7 +257,7 @@ const DeletionError = ({ error, onRetry }: DeletionErrorProps) => (
       <XCircle size={16} />
       <span className="text-sm">Deletion failed: {error}</span>
     </div>
-    <Button type="default" size="small" onClick={onRetry}>
+    <Button size="small" onClick={onRetry}>
       Retry
     </Button>
   </div>

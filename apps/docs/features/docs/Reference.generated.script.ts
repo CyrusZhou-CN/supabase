@@ -17,7 +17,8 @@ import selfHostingRealtimeCommonSections from '~/spec/common-self-hosting-realti
 import selfHostingStorageCommonSections from '~/spec/common-self-hosting-storage-sections.json' with { type: 'json' }
 import storageSpec from '~/spec/storage_v0_openapi.json' with { type: 'json' }
 import analyticsSpec from '~/spec/transforms/analytics_v0_openapi_deparsed.json' with { type: 'json' }
-import openApiSpec from '~/spec/transforms/api_v1_openapi_deparsed.json' with { type: 'json' }
+import apiV1Spec from '~/spec/transforms/api_v1_openapi_deparsed.json' with { type: 'json' }
+import apiV2Spec from '~/spec/transforms/api_v2_openapi_deparsed.json' with { type: 'json' }
 import { isPlainObject, keyBy } from 'lodash-es'
 import slugify from 'slugify'
 import { parse } from 'yaml'
@@ -239,7 +240,32 @@ async function writeCliReferenceSections() {
 }
 
 async function writeApiReferenceSections() {
-  const endpointsById = mapEndpointsById(openApiSpec)
+  const mergedSpec = {
+    ...apiV1Spec,
+    paths: {
+      ...apiV1Spec.paths,
+      ...apiV2Spec.paths,
+    },
+    components: {
+      ...apiV1Spec.components,
+      schemas: {
+        ...apiV1Spec.components?.schemas,
+        ...apiV2Spec.components?.schemas,
+      },
+      securitySchemes: {
+        ...apiV1Spec.components?.securitySchemes,
+        ...apiV2Spec.components?.securitySchemes,
+      },
+    },
+  }
+
+  // Mgmt api specs bundled without `--dereferenced`
+  // (v2 has a circular ref in APIErrorObject.issues),
+  // so we resolve $refs manually here.
+  // Cycles are left as an unresolved $ref rather than expanded infinitely.
+  const resolvedSpec = resolveRefs(mergedSpec, mergedSpec)
+
+  const endpointsById = mapEndpointsById(resolvedSpec)
   const pendingEndpointsByIdWrite = writeFile(
     join(GENERATED_DIRECTORY, 'api.latest.endpointsById.json'),
     JSON.stringify(Array.from(endpointsById.entries()))
@@ -272,6 +298,53 @@ async function writeApiReferenceSections() {
     pendingFlattenedApiSectionsWrite,
     pendingApiSlugDictionaryWrite,
   ])
+}
+
+function resolveRefs(node: any, root: any, refChain: string[] = []): any {
+  if (Array.isArray(node)) {
+    return node.map((item) => resolveRefs(item, root, refChain))
+  }
+
+  if (isPlainObject(node)) {
+    if ('$ref' in node && typeof node.$ref === 'string') {
+      const refPath = node.$ref
+
+      // Cycle guard: if we're already in the middle of resolving this exact
+      // ref, inlining further would recurse forever (e.g. APIErrorObject.issues
+      // -> APIErrorObject). Leave the $ref pointer unresolved at that point
+      // instead of expanding infinitely.
+      if (refChain.includes(refPath)) {
+        return { $ref: refPath }
+      }
+
+      // Only handle local refs (#/components/...) — this spec doesn't use
+      // external file refs post-bundling.
+      if (!refPath.startsWith('#/')) {
+        return node
+      }
+
+      const segments = refPath.replace(/^#\//, '').split('/')
+      let target = root
+      for (const seg of segments) {
+        target = target?.[seg]
+      }
+
+      if (target === undefined) {
+        console.warn(`Could not resolve $ref: ${refPath}`)
+        return node
+      }
+
+      return resolveRefs(target, root, [...refChain, refPath])
+    }
+
+    const result: Record<string, any> = {}
+    for (const [key, value] of Object.entries(node)) {
+      result[key] = resolveRefs(value, root, refChain)
+    }
+    return result
+  }
+
+  return node
 }
 
 async function writeSelfHostingReferenceSections() {

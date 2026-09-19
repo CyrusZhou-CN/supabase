@@ -60,7 +60,6 @@ export const MergeRequestButton = () => {
 
   return (
     <ButtonTooltip
-      type="default"
       className="rounded-full w-[26px] h-[26px]"
       onClick={handleClick}
       loading={isUpdating}

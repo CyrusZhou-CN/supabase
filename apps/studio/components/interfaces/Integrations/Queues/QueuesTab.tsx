@@ -10,7 +10,7 @@ import { GenericSkeletonLoader } from 'ui-patterns/ShimmeringLoader'
 
 import { CreateQueueSheet } from './CreateQueueSheet'
 import { formatQueueColumns, prepareQueuesForDataGrid } from './Queues.utils'
-import AlertError from '@/components/ui/AlertError'
+import { AlertError } from '@/components/ui/AlertError'
 import { useQueuesQuery } from '@/data/database-queues/database-queues-query'
 import { useSelectedProjectQuery } from '@/hooks/misc/useSelectedProject'
 import { onSearchInputEscape } from '@/lib/keyboard'
@@ -99,7 +99,7 @@ export const QueuesTab = () => {
                   <Button
                     key="clear"
                     size="tiny"
-                    type="text"
+                    variant="text"
                     icon={<X />}
                     onClick={clearSearch}
                     className="p-0 h-5 w-5"
@@ -109,15 +109,12 @@ export const QueuesTab = () => {
             />
 
             <div className="flex items-center gap-x-2">
-              <Button
-                type="default"
-                icon={<RefreshCw />}
-                loading={isRefetching}
-                onClick={() => refetch()}
-              >
+              <Button icon={<RefreshCw />} loading={isRefetching} onClick={() => refetch()}>
                 Refresh
               </Button>
-              <Button onClick={() => setCreateQueueSheetShown(true)}>Create queue</Button>
+              <Button variant="primary" onClick={() => setCreateQueueSheetShown(true)}>
+                Create queue
+              </Button>
             </div>
           </div>
 

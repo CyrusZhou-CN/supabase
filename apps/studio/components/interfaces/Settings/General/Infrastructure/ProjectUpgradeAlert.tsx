@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from 'ui'
-import { Admonition } from 'ui-patterns/admonition'
+import { Admonition } from 'ui-patterns/Admonition'
 import { FormItemLayout } from 'ui-patterns/form/FormItemLayout/FormItemLayout'
 import { z } from 'zod'
 
@@ -127,7 +127,7 @@ export const ProjectUpgradeAlert = () => {
           <DialogTrigger asChild>
             <ButtonTooltip
               size="tiny"
-              type="primary"
+              variant="primary"
               className="mt-2"
               disabled={projectUpgradeDisabled}
               tooltip={{
@@ -182,7 +182,7 @@ export const ProjectUpgradeAlert = () => {
                           </p>
 
                           <div>
-                            <Button size="tiny" type="default" asChild>
+                            <Button size="tiny" asChild>
                               <Link
                                 href={`${DOCS_URL}/guides/platform/migrating-and-upgrading-projects#caveats`}
                                 target="_blank"
@@ -224,7 +224,7 @@ export const ProjectUpgradeAlert = () => {
                             </div>
                           </div>
                           <div>
-                            <Button size="tiny" type="default" asChild>
+                            <Button size="tiny" asChild>
                               <Link
                                 href={`${DOCS_URL}/guides/platform/migrating-and-upgrading-projects#caveats`}
                                 target="_blank"
@@ -276,14 +276,15 @@ export const ProjectUpgradeAlert = () => {
                   </div>
                 </DialogSection>
                 <DialogFooter>
-                  <Button
-                    type="default"
-                    onClick={() => setShowUpgradeModal(false)}
-                    disabled={isUpgrading}
-                  >
+                  <Button onClick={() => setShowUpgradeModal(false)} disabled={isUpgrading}>
                     Cancel
                   </Button>
-                  <Button htmlType="submit" disabled={isUpgrading} loading={isUpgrading}>
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={isUpgrading}
+                    loading={isUpgrading}
+                  >
                     Confirm upgrade
                   </Button>
                 </DialogFooter>

@@ -57,7 +57,9 @@ import { STORAGE_BUCKETS_SHORTCUT_IDS, storageBucketsRegistry } from './registry
 import { STORAGE_EXPLORER_SHORTCUT_IDS, storageExplorerRegistry } from './registry/storage-explorer'
 import { STORAGE_NAV_SHORTCUT_IDS, storageNavRegistry } from './registry/storage-nav'
 import { TABLE_EDITOR_SHORTCUT_IDS, tableEditorRegistry } from './registry/table-editor'
+import { UNIFIED_LOGS_SHORTCUT_IDS, unifiedLogsRegistry } from './registry/unified-logs'
 import { ShortcutDefinition } from './types'
+import { PRODUCT_NAME } from '@/lib/constants/compute'
 
 /**
  * The canonical list of shortcut IDs. Add new shortcuts here first, then
@@ -69,6 +71,11 @@ import { ShortcutDefinition } from './types'
 export const SHORTCUT_IDS = {
   COMMAND_MENU_OPEN: 'command-menu.open',
   AI_ASSISTANT_TOGGLE: 'ai-assistant.toggle',
+  AI_ASSISTANT_NEW_CHAT: 'ai-assistant.new-chat',
+  AI_ASSISTANT_MAXIMIZE: 'ai-assistant.maximize',
+  AI_ASSISTANT_COPY_CHAT_ID: 'ai-assistant.copy-chat-id',
+  AI_ASSISTANT_TOGGLE_HISTORY: 'ai-assistant.toggle-history',
+  AI_ASSISTANT_OPEN_PERMISSIONS: 'ai-assistant.open-permissions',
   AI_ASSISTANT_CANCEL_EDIT: 'ai-assistant.cancel-edit',
   INLINE_EDITOR_TOGGLE: 'inline-editor.toggle',
   RESULTS_COPY_MARKDOWN: 'results.copy-markdown',
@@ -83,7 +90,6 @@ export const SHORTCUT_IDS = {
   OPERATION_QUEUE_SAVE: 'operation-queue.save',
   OPERATION_QUEUE_TOGGLE: 'operation-queue.toggle',
   OPERATION_QUEUE_UNDO: 'operation-queue.undo',
-  UNIFIED_LOGS_RESET_FOCUS: 'unified-logs.reset-focus',
   NAV_HOME: 'nav.home',
   NAV_TABLE_EDITOR: 'nav.table-editor',
   NAV_SQL_EDITOR: 'nav.sql-editor',
@@ -91,6 +97,7 @@ export const SHORTCUT_IDS = {
   NAV_AUTH: 'nav.auth',
   NAV_STORAGE: 'nav.storage',
   NAV_FUNCTIONS: 'nav.functions',
+  NAV_COMPUTE: 'nav.compute',
   NAV_REALTIME: 'nav.realtime',
   NAV_ADVISORS: 'nav.advisors',
   NAV_OBSERVABILITY: 'nav.observability',
@@ -123,6 +130,9 @@ export const SHORTCUT_IDS = {
 
   // Table editor shortcuts
   ...TABLE_EDITOR_SHORTCUT_IDS,
+
+  // Unified Logs page shortcuts
+  ...UNIFIED_LOGS_SHORTCUT_IDS,
 
   // SQL editor shortcuts
   ...SQL_EDITOR_SHORTCUT_IDS,
@@ -250,6 +260,36 @@ export const SHORTCUT_DEFINITIONS: Record<ShortcutId, ShortcutDefinition> = {
     label: 'Download results as CSV',
     sequence: ['Mod+Shift+D'],
   },
+  [SHORTCUT_IDS.AI_ASSISTANT_NEW_CHAT]: {
+    id: SHORTCUT_IDS.AI_ASSISTANT_NEW_CHAT,
+    label: 'Start new chat',
+    sequence: ['A', 'N'],
+    showInSettings: false,
+  },
+  [SHORTCUT_IDS.AI_ASSISTANT_MAXIMIZE]: {
+    id: SHORTCUT_IDS.AI_ASSISTANT_MAXIMIZE,
+    label: 'Open chat in Explorer',
+    sequence: ['A', '='],
+    showInSettings: false,
+  },
+  [SHORTCUT_IDS.AI_ASSISTANT_COPY_CHAT_ID]: {
+    id: SHORTCUT_IDS.AI_ASSISTANT_COPY_CHAT_ID,
+    label: 'Copy chat ID',
+    sequence: ['A', 'C'],
+    showInSettings: false,
+  },
+  [SHORTCUT_IDS.AI_ASSISTANT_TOGGLE_HISTORY]: {
+    id: SHORTCUT_IDS.AI_ASSISTANT_TOGGLE_HISTORY,
+    label: 'Toggle chat history',
+    sequence: ['A', 'Y'],
+    showInSettings: false,
+  },
+  [SHORTCUT_IDS.AI_ASSISTANT_OPEN_PERMISSIONS]: {
+    id: SHORTCUT_IDS.AI_ASSISTANT_OPEN_PERMISSIONS,
+    label: 'Permission settings',
+    sequence: ['A', 'P'],
+    showInSettings: false,
+  },
   [SHORTCUT_IDS.AI_ASSISTANT_CANCEL_EDIT]: {
     id: SHORTCUT_IDS.AI_ASSISTANT_CANCEL_EDIT,
     label: 'Cancel AI Assistant edit',
@@ -258,19 +298,19 @@ export const SHORTCUT_DEFINITIONS: Record<ShortcutId, ShortcutDefinition> = {
   },
   [SHORTCUT_IDS.DATA_TABLE_TOGGLE_FILTERS]: {
     id: SHORTCUT_IDS.DATA_TABLE_TOGGLE_FILTERS,
-    label: 'Toggle data table filter controls',
+    label: 'Toggle filter sidebar',
     sequence: ['Mod+B'],
     showInSettings: false,
   },
   [SHORTCUT_IDS.DATA_TABLE_RESET_FILTERS]: {
     id: SHORTCUT_IDS.DATA_TABLE_RESET_FILTERS,
-    label: 'Reset data table filters',
+    label: 'Reset filters',
     sequence: ['Mod+Escape'],
     showInSettings: false,
   },
   [SHORTCUT_IDS.DATA_TABLE_RESET_COLUMNS]: {
     id: SHORTCUT_IDS.DATA_TABLE_RESET_COLUMNS,
-    label: 'Reset data table columns',
+    label: 'Reset columns',
     sequence: ['Mod+U'],
     showInSettings: false,
   },
@@ -302,12 +342,6 @@ export const SHORTCUT_DEFINITIONS: Record<ShortcutId, ShortcutDefinition> = {
     id: SHORTCUT_IDS.OPERATION_QUEUE_UNDO,
     label: 'Undo latest table edit',
     sequence: ['Mod+Z'],
-    showInSettings: false,
-  },
-  [SHORTCUT_IDS.UNIFIED_LOGS_RESET_FOCUS]: {
-    id: SHORTCUT_IDS.UNIFIED_LOGS_RESET_FOCUS,
-    label: 'Reset focus in logs',
-    sequence: ['Mod+.'],
     showInSettings: false,
   },
   [SHORTCUT_IDS.NAV_HOME]: {
@@ -356,6 +390,13 @@ export const SHORTCUT_DEFINITIONS: Record<ShortcutId, ShortcutDefinition> = {
     id: SHORTCUT_IDS.NAV_FUNCTIONS,
     label: 'Go to Edge Functions',
     sequence: ['G', 'F'],
+    showInSettings: false,
+    referenceGroup: SHORTCUT_REFERENCE_GROUPS.NAVIGATION_GLOBAL,
+  },
+  [SHORTCUT_IDS.NAV_COMPUTE]: {
+    id: SHORTCUT_IDS.NAV_COMPUTE,
+    label: `Go to ${PRODUCT_NAME}`,
+    sequence: ['G', 'C'],
     showInSettings: false,
     referenceGroup: SHORTCUT_REFERENCE_GROUPS.NAVIGATION_GLOBAL,
   },
@@ -479,6 +520,9 @@ export const SHORTCUT_DEFINITIONS: Record<ShortcutId, ShortcutDefinition> = {
 
   // Table editor shortcut registration
   ...tableEditorRegistry,
+
+  // Unified Logs page shortcut registration
+  ...unifiedLogsRegistry,
 
   // SQL editor shortcut registration
   ...sqlEditorRegistry,
